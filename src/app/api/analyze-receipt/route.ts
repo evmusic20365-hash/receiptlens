@@ -48,13 +48,15 @@ export async function POST(request: Request) {
       "emoji": "<single emoji for this product category>",
       "name": "<category name, e.g. Grooming, Drinks, Clothing, Household, Produce>",
       "rating": "<'green' | 'yellow' | 'red'>",
+      "savingsRange": { "min": <lowest monthly savings if bought cheaper>, "max": <highest monthly savings> },
       "items": [
         {
           "name": "<exact item name from receipt>",
           "paid": <price paid as number>,
           "suggestion": "<detective-style price finding or confirmation>",
           "cheaperStore": "<store name — only include for yellow and red ratings>",
-          "cheaperPrice": <cheaper unit price as number — only include for yellow and red ratings>
+          "cheaperPrice": <cheaper unit price as number — only include for yellow and red ratings>,
+          "searchUrl": "<direct search URL — only include for yellow and red ratings>"
         }
       ]
     }
@@ -66,14 +68,27 @@ export async function POST(request: Request) {
 CRITICAL RULES — read carefully:
 1. You are a PRICE DETECTIVE, not a lifestyle coach. NEVER comment on whether an item is healthy, necessary, or a good personal choice. Only compare prices objectively.
 2. Rating definitions — price comparison ONLY:
-   - green: This is the best or near-best price available. Suggestion: "Best price around. Case closed."
+   - green: This is the best or near-best price available. Suggestion: "Best price around. Case closed." savingsRange: { min: 0, max: 0 }
    - yellow: 1–19% cheaper somewhere else. Suggestion: "Walmart has this for $X.XX — saves you $X.XX."
    - red: 20%+ cheaper somewhere else, OR a multipack dramatically reduces per-unit cost. Suggestion: "Amazon has a 3-pack for $X.XX vs $X.XX here — save X%."
-3. Every yellow or red item MUST include a real store name (Amazon, Walmart, Target, Costco, Walgreens, CVS, Aldi, Trader Joe's, Sam's Club) and a specific realistic price.
-4. Suggest multipacks and bundles when they represent significantly better value.
-5. Use detective personality in suggestions: "Case closed.", "No leads on a cheaper price.", "Suspect: Amazon at $X.XX.", "Investigation complete."
-6. Group related items into logical named categories. One category can contain multiple items.
-7. Be specific and accurate with price comparisons — only suggest stores that realistically carry that item.
+3. Every yellow or red item MUST include:
+   - A real store name (Amazon, Walmart, Target, Costco, Walgreens, CVS, Aldi, Trader Joe's, Sam's Club)
+   - A specific realistic price
+   - A searchUrl following these formats:
+     * Amazon:   "https://www.amazon.com/s?k=Item+Name+Here"
+     * Walmart:  "https://www.walmart.com/search?q=Item+Name+Here"
+     * Target:   "https://www.target.com/s?searchTerm=Item+Name+Here"
+     * Costco:   "https://www.costco.com/CatalogSearch?keyword=Item+Name"
+     * Walgreens:"https://www.walgreens.com/search/results.jsp?Ntt=Item+Name"
+     * CVS:      "https://www.cvs.com/search/?searchTerm=Item+Name"
+   Use the item name with spaces replaced by + signs. Always use https://
+4. savingsRange per category: estimate monthly savings assuming this item is purchased once per month.
+   - For green categories: { "min": 0, "max": 0 }
+   - For yellow/red: min = smallest per-item saving in category, max = largest
+5. Suggest multipacks and bundles when they represent significantly better value.
+6. Use detective personality in suggestions: "Case closed.", "No leads on a cheaper price.", "Suspect: Amazon at $X.XX.", "Investigation complete."
+7. Group related items into logical named categories. One category can contain multiple items.
+8. Be specific and accurate with price comparisons — only suggest stores that realistically carry that item.
 
 Receipt items:
 ${dataText}`,

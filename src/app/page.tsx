@@ -43,6 +43,7 @@ interface AnalysisItem {
   suggestion: string;
   cheaperStore?: string;
   cheaperPrice?: number;
+  searchUrl?: string;
 }
 
 interface Category {
@@ -50,6 +51,7 @@ interface Category {
   name: string;
   rating: "green" | "yellow" | "red";
   items: AnalysisItem[];
+  savingsRange?: { min: number; max: number };
 }
 
 interface AnalysisResult {
@@ -89,30 +91,35 @@ const FALLBACK: AnalysisResult = {
       emoji: "🧴",
       name: "Grooming",
       rating: "red",
+      savingsRange: { min: 7, max: 7 },
       items: [{
         name: "Duke Cannon Soap",
         paid: 14.99,
         suggestion: "Amazon has a 2-pack for $15.99 — that's $8 each vs $14.99. Save 47%.",
         cheaperStore: "Amazon",
         cheaperPrice: 7.99,
+        searchUrl: "https://www.amazon.com/s?k=Duke+Cannon+Soap",
       }],
     },
     {
       emoji: "🥤",
       name: "Drinks",
       rating: "yellow",
+      savingsRange: { min: 1, max: 3 },
       items: [{
         name: "LaCroix 12-pack",
         paid: 6.99,
         suggestion: "Walmart has this for $5.98 — saves you $1.01.",
         cheaperStore: "Walmart",
         cheaperPrice: 5.98,
+        searchUrl: "https://www.walmart.com/search?q=LaCroix+Sparkling+Water+12+pack",
       }],
     },
     {
       emoji: "🥦",
       name: "Produce",
       rating: "green",
+      savingsRange: { min: 0, max: 0 },
       items: [{
         name: "Organic Broccoli",
         paid: 2.49,
@@ -705,35 +712,55 @@ function History({ onNavTab }: { onNavTab: (tab: NavTab) => void }) {
 }
 
 // ── Reveal ───────────────────────────────────────────────────────────────────
+function fmtSavings(n: number) {
+  return n % 1 === 0 ? `$${n}` : `$${n.toFixed(2)}`;
+}
+
 function CategoryCard({ category, index }: { category: Category; index: number }) {
   const [expanded, setExpanded] = useState(false);
-  const r = RATING_CONFIG[category.rating];
+
+  const sr = category.savingsRange;
+  const hasSavings = sr && (sr.min > 0 || sr.max > 0);
+  const savingsLabel = hasSavings
+    ? sr!.min === sr!.max
+      ? `${fmtSavings(sr!.min)}/mo`
+      : `${fmtSavings(sr!.min)}–${fmtSavings(sr!.max)}/mo`
+    : null;
 
   return (
     <div
       className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
       style={{ animation: `cardIn 0.55s cubic-bezier(0.34,1.56,0.64,1) ${300 + index * 110}ms both` }}
     >
-      {/* Header row — always visible */}
+      {/* Collapsed header */}
       <button
-        className="w-full flex items-center gap-3 p-4 text-left"
+        className="w-full flex items-center gap-4 px-4 py-4 text-left active:bg-white/[0.03] transition-colors"
         onClick={() => setExpanded(e => !e)}
       >
-        <div className="w-12 h-12 rounded-xl bg-white/[0.06] flex items-center justify-center text-2xl flex-shrink-0">
+        <div className="w-14 h-14 rounded-2xl bg-white/[0.07] flex items-center justify-center flex-shrink-0"
+             style={{ fontSize: "32px", lineHeight: 1 }}>
           {category.emoji}
         </div>
+
         <div className="flex-1 min-w-0">
-          <p className="text-base font-black text-white leading-tight">{category.name}</p>
+          <p className="font-black text-white leading-tight" style={{ fontSize: "18px" }}>
+            {category.name}
+          </p>
           <p className="text-xs text-zinc-500 mt-0.5">
             {category.items.length} item{category.items.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${r.pill}`}>
-            {r.label}
-          </span>
+
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          {savingsLabel ? (
+            <span className="text-sm font-black text-green-400 tabular-nums leading-none">
+              {savingsLabel}
+            </span>
+          ) : (
+            <span className="text-xs font-bold text-green-400 leading-none">Best price</span>
+          )}
           <svg
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
             className={`w-4 h-4 text-zinc-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
           >
             <path d="M6 9l6 6 6-6" />
@@ -741,36 +768,76 @@ function CategoryCard({ category, index }: { category: Category; index: number }
         </div>
       </button>
 
-      {/* Expandable content */}
+      {/* Expanded items */}
       <div
         style={{
-          maxHeight: expanded ? "600px" : "0",
-          transition: "max-height 0.35s cubic-bezier(0.4,0,0.2,1)",
+          maxHeight: expanded ? "900px" : "0",
+          transition: "max-height 0.4s cubic-bezier(0.4,0,0.2,1)",
           overflow: "hidden",
         }}
       >
-        <div className="px-4 pb-4 space-y-4 border-t border-white/[0.06]">
-          {category.items.map((item, j) => (
-            <div key={j} className="pt-3 space-y-1.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-bold text-white leading-tight">{item.name}</span>
-                <span className="text-sm font-bold tabular-nums text-zinc-300 flex-shrink-0">
-                  ${item.paid.toFixed(2)}
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">{item.suggestion}</p>
-              {item.cheaperStore && item.cheaperPrice != null && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-violet-400">
-                    {item.cheaperStore}
+        <div className="border-t border-white/[0.06] divide-y divide-white/[0.04]">
+          {category.items.map((item, j) => {
+            const itemSavings = item.cheaperPrice != null
+              ? Math.max(0, item.paid - item.cheaperPrice)
+              : 0;
+            const isGreen  = !item.cheaperStore;
+            const safeUrl  = item.searchUrl?.startsWith("https://") ? item.searchUrl : undefined;
+
+            return (
+              <div key={j} className="px-4 py-4 space-y-3">
+                {/* Item name */}
+                <p className="font-black text-white leading-snug" style={{ fontSize: "16px" }}>
+                  {item.name}
+                </p>
+
+                {/* Price paid row */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                    You paid
                   </span>
-                  <span className="text-[10px] text-zinc-500 tabular-nums">
-                    ${item.cheaperPrice.toFixed(2)}
+                  <span className="text-xl font-black tabular-nums text-white">
+                    ${item.paid.toFixed(2)}
                   </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {isGreen ? (
+                  <p className="text-sm font-semibold text-green-400 leading-snug">
+                    ✓ Best price found. Case closed.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-zinc-300 leading-relaxed">{item.suggestion}</p>
+
+                    {itemSavings > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                          Save
+                        </span>
+                        <span className="text-base font-black text-green-400 tabular-nums">
+                          ${itemSavings.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
+                    {item.cheaperStore && safeUrl && (
+                      <a
+                        href={safeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-400 hover:text-violet-300 active:text-violet-500 transition-colors"
+                      >
+                        <span>View on {item.cheaperStore}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="w-3.5 h-3.5 flex-shrink-0">
+                          <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
