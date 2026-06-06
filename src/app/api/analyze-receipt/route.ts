@@ -21,7 +21,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const receiptItems: ReceiptItem[] | null = body.items ?? null;
 
-  // Format items for the prompt
+  console.log("[analyze-receipt] incoming request:", {
+    hasItems:  !!receiptItems,
+    itemCount: receiptItems?.length ?? 0,
+    mode:      receiptItems ? "real receipt" : "sample data",
+  });
+
   const dataText = receiptItems
     ? receiptItems
         .map((item) => `- ${item.name}: $${Number(item.price).toFixed(2)} x ${item.quantity || 1}`)
@@ -30,13 +35,15 @@ export async function POST(request: Request) {
 
   const dataLabel = receiptItems ? "Receipt items" : "Transactions";
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `Analyze these ${dataLabel.toLowerCase()} and identify spending leaks. Return ONLY valid JSON — no markdown, no code fences.
+  let message: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: `Analyze these ${dataLabel.toLowerCase()} and identify spending leaks. Return ONLY valid JSON — no markdown, no code fences.
 
 {
   "score": <integer 0-100, shopping health — 100 = perfect, lower = more leaks>,
@@ -54,16 +61,29 @@ Rules:
 
 ${dataLabel}:
 ${dataText}`,
-      },
-    ],
-  });
-
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
-  const match = text.match(/\{[\s\S]*\}/);
-
-  if (!match) {
-    return Response.json({ error: "parse_failed" }, { status: 500 });
+        },
+      ],
+    });
+    console.log("[analyze-receipt] Claude response:", message.content[0]);
+  } catch (err) {
+    console.error("[analyze-receipt] Claude API error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: `Analysis failed: ${msg}` }, { status: 500 });
   }
 
-  return Response.json(JSON.parse(match[0]));
+  const text  = message.content[0].type === "text" ? message.content[0].text : "";
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.error("[analyze-receipt] no JSON found in Claude response, raw text:", text);
+    return Response.json({ error: "Could not parse analysis response — Claude returned unexpected output." }, { status: 500 });
+  }
+
+  try {
+    const parsed = JSON.parse(match[0]);
+    console.log("[analyze-receipt] parsed result:", parsed);
+    return Response.json(parsed);
+  } catch (err) {
+    console.error("[analyze-receipt] JSON.parse error:", err, "raw match:", match[0]);
+    return Response.json({ error: "Could not parse analysis response." }, { status: 500 });
+  }
 }

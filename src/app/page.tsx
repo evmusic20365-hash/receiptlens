@@ -316,9 +316,13 @@ function Splash({
 function Scan({
   onProgressDone,
   filename,
+  error,
+  onRetry,
 }: {
   onProgressDone: () => void;
   filename?: string;
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const [progress, setProgress] = useState(0);
   const [step, setStep]         = useState(0);
@@ -349,35 +353,56 @@ function Scan({
     <div className="min-h-screen bg-[#0d0d0d] text-white font-sans flex flex-col">
       <div className="px-6 pt-14 pb-4 flex items-end justify-between border-b border-white/[0.07]">
         <h1 className="text-lg font-black tracking-tight">RECEIPT DETECTIVE</h1>
-        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Investigating</span>
+        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">
+          {error ? "Error" : "Investigating"}
+        </span>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 gap-8">
         <SpyCharacter className="w-28 h-auto opacity-90" />
         <div className="w-full max-w-sm space-y-5">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">Status</p>
-            <div className="h-6 overflow-hidden">
-              <p key={step} className="text-base font-semibold text-white animate-[fade-up_0.22s_ease-out_forwards]">
-                {SCAN_STEPS[step]}
-              </p>
-            </div>
-            {filename && (
-              <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate">📎 {filename}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <div className="w-full h-2 bg-[#1e1e1e] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">Progress</span>
-              <span className="text-sm font-bold text-red-500 tabular-nums">{progress}%</span>
-            </div>
-          </div>
+          {error ? (
+            <>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-[0.2em] mb-2">Scan Failed</p>
+                <p className="text-sm text-zinc-300 leading-relaxed">{error}</p>
+              </div>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="w-full bg-[#161616] border border-white/[0.07] hover:bg-[#1e1e1e] text-zinc-300 py-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-colors"
+                >
+                  TRY AGAIN
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">Status</p>
+                <div className="h-6 overflow-hidden">
+                  <p key={step} className="text-base font-semibold text-white animate-[fade-up_0.22s_ease-out_forwards]">
+                    {SCAN_STEPS[step]}
+                  </p>
+                </div>
+                {filename && (
+                  <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate">📎 {filename}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="w-full h-2 bg-[#1e1e1e] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">Progress</span>
+                  <span className="text-sm font-bold text-red-500 tabular-nums">{progress}%</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -779,11 +804,13 @@ export default function Home() {
   const [scannedFile, setScannedFile] = useState<ScannedFile | null>(null);
   const [receiptData, setReceiptData] = useState<ExtractedReceipt | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [scanError, setScanError]     = useState<string | null>(null);
 
   const phaseRef     = useRef<Phase>("splash");
   const inTransition = useRef(false);
   const progressDone = useRef(false);
   const apiDone      = useRef(false);
+  const scanErrorRef = useRef<string | null>(null);
 
   const transitionTo = useCallback((next: Phase) => {
     if (inTransition.current || phaseRef.current === next) return;
@@ -802,43 +829,57 @@ export default function Home() {
   // Two-step API chain: vision extraction → leak analysis → save to DB
   useEffect(() => {
     if (phase !== "scanning") return;
-    progressDone.current = false;
-    apiDone.current = false;
+    progressDone.current  = false;
+    apiDone.current       = false;
+    scanErrorRef.current  = null;
+    setScanError(null);
 
     const run = async () => {
+      let succeeded = false;
       try {
         // Step 1 — extract items from receipt image (if provided)
         let extracted: ExtractedReceipt | null = null;
         if (scannedFile?.base64) {
-          const res = await fetch("/api/upload-receipt", {
-            method: "POST",
+          const res        = await fetch("/api/upload-receipt", {
+            method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: scannedFile.base64 }),
+            body:    JSON.stringify({ imageBase64: scannedFile.base64 }),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.error) { extracted = data as ExtractedReceipt; setReceiptData(extracted); }
+          const uploadData = await res.json();
+          if (!res.ok || uploadData.error) {
+            throw new Error(uploadData.error ?? `Upload failed (${res.status})`);
           }
+          extracted = uploadData as ExtractedReceipt;
+          setReceiptData(extracted);
         }
 
-        // Step 2 — leak analysis, using real items when available
-        const analyzeRes = await fetch("/api/analyze-receipt", {
-          method: "POST",
+        // Step 2 — leak analysis using real items when available
+        const analyzeRes  = await fetch("/api/analyze-receipt", {
+          method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: extracted?.items ?? null }),
+          body:    JSON.stringify({ items: extracted?.items ?? null }),
         });
-        const raw = (await analyzeRes.json()) as AnalysisResult;
-        const finalResult = raw.leaks ? raw : FALLBACK;
-        setResult(finalResult);
+        const raw = await analyzeRes.json();
+        if (!analyzeRes.ok || raw.error) {
+          throw new Error(raw.error ?? `Analysis failed (${analyzeRes.status})`);
+        }
+        if (!raw.leaks) {
+          throw new Error("Analysis returned an unexpected format.");
+        }
+        setResult(raw as AnalysisResult);
+        succeeded = true;
 
-        // Step 3 — persist to Supabase (non-blocking; failure doesn't block reveal)
-        saveScanToDb(extracted, finalResult, scannedFile?.base64)
+        // Step 3 — persist to Supabase (non-blocking)
+        saveScanToDb(extracted, raw as AnalysisResult, scannedFile?.base64)
           .catch((err) => console.warn("Supabase save failed:", err));
-      } catch {
-        setResult(FALLBACK);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
+        console.error("[scan] pipeline error:", err);
+        scanErrorRef.current = msg;
+        setScanError(msg);
       } finally {
         apiDone.current = true;
-        if (progressDone.current) transitionTo("reveal");
+        if (succeeded && progressDone.current) transitionTo("reveal");
       }
     };
 
@@ -847,7 +888,7 @@ export default function Home() {
 
   const handleProgressDone = useCallback(() => {
     progressDone.current = true;
-    if (apiDone.current) transitionTo("reveal");
+    if (apiDone.current && !scanErrorRef.current) transitionTo("reveal");
   }, [transitionTo]);
 
   const handleScan = useCallback((file: ScannedFile) => {
@@ -859,6 +900,8 @@ export default function Home() {
     setResult(null);
     setScannedFile(null);
     setReceiptData(null);
+    setScanError(null);
+    scanErrorRef.current = null;
     setShowHistory(false);
     transitionTo("splash");
   }, [transitionTo]);
@@ -881,7 +924,7 @@ export default function Home() {
       ) : (
         <>
           {phase === "splash"   && <Splash   onScan={handleScan} onNavTab={handleNavTab} />}
-          {phase === "scanning" && <Scan     onProgressDone={handleProgressDone} filename={scannedFile?.name} />}
+          {phase === "scanning" && <Scan     onProgressDone={handleProgressDone} filename={scannedFile?.name} error={scanError} onRetry={handleRescan} />}
           {phase === "reveal"   && (
             <Reveal
               data={result ?? FALLBACK}
