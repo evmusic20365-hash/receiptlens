@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { ServiceWorkerRegistrar } from "./sw-register";
 
 const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
@@ -9,8 +10,26 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Receipt Detective",
+  title: "ReceiptLens",
   description: "We find what others miss.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black",
+    title: "ReceiptLens",
+  },
+  icons: {
+    icon: "/icon-512.svg",
+    apple: "/icon-512.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -18,7 +37,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${hanken.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ServiceWorkerRegistrar />
+        {children}
+      </body>
     </html>
   );
 }

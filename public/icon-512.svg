@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0d0d0d"/>
+
+  <!-- Hat crown -->
+  <path d="M150 228 C150 162 180 134 256 132 C332 134 362 162 362 228" fill="#111"/>
+  <!-- Hat brim -->
+  <ellipse cx="256" cy="232" rx="146" ry="30" fill="#111"/>
+  <!-- Hat band (red) -->
+  <path d="M166 214 Q256 202 346 214" stroke="#ef4444" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <!-- Crown indent -->
+  <path d="M200 174 Q256 162 312 174" stroke="#222" stroke-width="4" fill="none"/>
+
+  <!-- Face -->
+  <ellipse cx="256" cy="318" rx="94" ry="102" fill="#fde8c8" stroke="#111" stroke-width="6"/>
+
+  <!-- Left eye -->
+  <ellipse cx="214" cy="295" rx="26" ry="28" fill="white" stroke="#111" stroke-width="5"/>
+  <circle cx="222" cy="300" r="14" fill="#111"/>
+  <circle cx="228" cy="294" r="5" fill="white"/>
+
+  <!-- Right eye -->
+  <ellipse cx="298" cy="295" rx="26" ry="28" fill="white" stroke="#111" stroke-width="5"/>
+  <circle cx="306" cy="300" r="14" fill="#111"/>
+  <circle cx="312" cy="294" r="5" fill="white"/>
+
+  <!-- Eyebrows -->
+  <path d="M190 272 Q214 262 238 272" stroke="#7c5c38" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M274 272 Q298 262 322 272" stroke="#7c5c38" stroke-width="9" stroke-linecap="round" fill="none"/>
+
+  <!-- Nose -->
+  <path d="M248 326 Q256 336 264 326" stroke="#c4956a" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+  <!-- Smirk -->
+  <path d="M224 350 Q254 368 292 348" stroke="#111" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <path d="M290 348 Q302 339 298 352" stroke="#111" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+  <!-- Collar / coat top -->
+  <path d="M162 416 L256 450 L350 416" fill="#1e2535" stroke="#111" stroke-width="5"/>
+
+  <!-- Tie (red) -->
+  <path d="M256 448 L246 476 L256 490 L266 476 Z" fill="#ef4444" stroke="#111" stroke-width="4"/>
+  <ellipse cx="256" cy="450" rx="13" ry="10" fill="#dc2626" stroke="#111" stroke-width="4"/>
+
+  <!-- Magnifying glass (top right corner) -->
+  <circle cx="390" cy="180" r="66" fill="rgba(186,230,253,0.08)" stroke="#111" stroke-width="9"/>
+  <circle cx="390" cy="180" r="54" fill="none" stroke="#333" stroke-width="3"/>
+  <path d="M360 155 Q378 143 398 149" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.45"/>
+  <!-- Handle -->
+  <line x1="428" y1="218" x2="458" y2="258" stroke="#ef4444" stroke-width="20" stroke-linecap="round"/>
+</svg>
