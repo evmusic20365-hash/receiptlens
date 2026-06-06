@@ -19,6 +19,19 @@ interface ScannedFile {
   base64: string;
 }
 
+interface ReceiptItem {
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface ExtractedReceipt {
+  storeName: string;
+  date: string;
+  items: ReceiptItem[];
+  total: number;
+}
+
 interface Leak {
   name: string;
   amount: number;
@@ -403,7 +416,7 @@ function LeakCard({ leak, index }: { leak: Leak; index: number }) {
   );
 }
 
-function Reveal({ data, onRescan }: { data: AnalysisResult; onRescan: () => void }) {
+function Reveal({ data, receipt, onRescan }: { data: AnalysisResult; receipt: ExtractedReceipt | null; onRescan: () => void }) {
   const [ready, setReady] = useState(false);
   const scoreVal   = useCountUp(data.score,           1200, 350);
   const monthlyVal = useCountUp(data.totalFound,      1300, 700);
@@ -431,6 +444,28 @@ function Reveal({ data, onRescan }: { data: AnalysisResult; onRescan: () => void
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-6 py-6 space-y-5 max-w-sm mx-auto">
+
+          {/* Receipt card — shown when a real receipt was scanned */}
+          {receipt && (
+            <div className="bg-[#161616] rounded-2xl border border-white/[0.07] p-4">
+              <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">
+                Receipt Scanned
+              </p>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-base font-black text-white leading-none truncate">
+                    {receipt.storeName || "Unknown Store"}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {receipt.date} · {receipt.items.length} item{receipt.items.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <p className="text-lg font-black tabular-nums flex-shrink-0">
+                  ${typeof receipt.total === "number" ? receipt.total.toFixed(2) : "—"}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Score ring */}
           <div className="bg-[#161616] rounded-3xl border border-white/[0.07] p-6 flex flex-col items-center">
@@ -524,10 +559,11 @@ function Reveal({ data, onRescan }: { data: AnalysisResult; onRescan: () => void
 
 // ── App shell ────────────────────────────────────────────────────────────────
 export default function Home() {
-  const [phase, setPhase]           = useState<Phase>("splash");
-  const [opacity, setOpacity]       = useState(1);
-  const [result, setResult]         = useState<AnalysisResult | null>(null);
+  const [phase, setPhase]             = useState<Phase>("splash");
+  const [opacity, setOpacity]         = useState(1);
+  const [result, setResult]           = useState<AnalysisResult | null>(null);
   const [scannedFile, setScannedFile] = useState<ScannedFile | null>(null);
+  const [receiptData, setReceiptData] = useState<ExtractedReceipt | null>(null);
 
   const phaseRef     = useRef<Phase>("splash");
   const inTransition = useRef(false);
@@ -548,25 +584,51 @@ export default function Home() {
     }, 300);
   }, []);
 
-  // Fire fetch the moment scanning starts; gate reveal on both finishing
+  // Fire API chain the moment scanning starts; gate reveal on both finishing.
+  // Step 1: extract items from receipt image (if provided).
+  // Step 2: analyse extracted items for spending leaks.
   useEffect(() => {
     if (phase !== "scanning") return;
     progressDone.current = false;
     apiDone.current = false;
 
-    fetch("/api/analyze-receipt", { method: "POST" })
-      .then((r) => r.json())
-      .then((data: AnalysisResult) => {
-        setResult(data.leaks ? data : FALLBACK);
-        apiDone.current = true;
-        if (progressDone.current) transitionTo("reveal");
-      })
-      .catch(() => {
+    const run = async () => {
+      try {
+        // Step 1 — vision extraction (only when user scanned a real image)
+        let extracted: ExtractedReceipt | null = null;
+        if (scannedFile?.base64) {
+          const uploadRes = await fetch("/api/upload-receipt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: scannedFile.base64 }),
+          });
+          if (uploadRes.ok) {
+            const data = await uploadRes.json();
+            if (!data.error) {
+              extracted = data as ExtractedReceipt;
+              setReceiptData(extracted);
+            }
+          }
+        }
+
+        // Step 2 — leak analysis, passing real items when available
+        const analyzeRes = await fetch("/api/analyze-receipt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: extracted?.items ?? null }),
+        });
+        const analysis = (await analyzeRes.json()) as AnalysisResult;
+        setResult(analysis.leaks ? analysis : FALLBACK);
+      } catch {
         setResult(FALLBACK);
+      } finally {
         apiDone.current = true;
         if (progressDone.current) transitionTo("reveal");
-      });
-  }, [phase, transitionTo]);
+      }
+    };
+
+    run();
+  }, [phase, scannedFile, transitionTo]);
 
   const handleProgressDone = useCallback(() => {
     progressDone.current = true;
@@ -581,6 +643,7 @@ export default function Home() {
   const handleRescan = useCallback(() => {
     setResult(null);
     setScannedFile(null);
+    setReceiptData(null);
     transitionTo("splash");
   }, [transitionTo]);
 
@@ -588,7 +651,7 @@ export default function Home() {
     <div style={{ opacity, transition: "opacity 0.3s ease" }}>
       {phase === "splash"   && <Splash onScan={handleScan} />}
       {phase === "scanning" && <Scan   onProgressDone={handleProgressDone} filename={scannedFile?.name} />}
-      {phase === "reveal"   && <Reveal data={result ?? FALLBACK} onRescan={handleRescan} />}
+      {phase === "reveal"   && <Reveal data={result ?? FALLBACK} receipt={receiptData} onRescan={handleRescan} />}
     </div>
   );
 }
