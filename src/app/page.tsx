@@ -14,6 +14,11 @@ const SCAN_STEPS = [
 ] as const;
 
 // ── Types ────────────────────────────────────────────────────────────────────
+interface ScannedFile {
+  name: string;
+  base64: string;
+}
+
 interface Leak {
   name: string;
   amount: number;
@@ -196,20 +201,26 @@ function BottomNav({ active }: { active: NavTab }) {
 }
 
 // ── Splash ───────────────────────────────────────────────────────────────────
-function Splash({ onScan }: { onScan: () => void }) {
+function Splash({ onScan }: { onScan: (file: ScannedFile) => void }) {
   const [visible, setVisible] = useState(false);
-  const cbRef = useRef(onScan);
-  cbRef.current = onScan;
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
-  useEffect(() => {
-    const id = setTimeout(() => cbRef.current(), 2000);
-    return () => clearTimeout(id);
-  }, []);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onScan({ name: file.name, base64: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+    // Reset so the same file can be picked again
+    e.target.value = "";
+  };
 
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white font-sans flex flex-col">
@@ -232,8 +243,17 @@ function Splash({ onScan }: { onScan: () => void }) {
         className={`px-6 pb-4 space-y-3 transition-all duration-700 delay-150 ease-out
           ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
       >
+        {/* Hidden file input — accepts images, prefers camera on mobile */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFileChange}
+        />
         <button
-          onClick={() => cbRef.current()}
+          onClick={() => fileRef.current?.click()}
           className="w-full bg-red-500 hover:bg-red-400 active:bg-red-600 text-white py-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-colors shadow-[0_4px_24px_rgba(239,68,68,0.35)]"
         >
           SCAN NOW
@@ -266,7 +286,7 @@ function Splash({ onScan }: { onScan: () => void }) {
 }
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
-function Scan({ onProgressDone }: { onProgressDone: () => void }) {
+function Scan({ onProgressDone, filename }: { onProgressDone: () => void; filename?: string }) {
   const [progress, setProgress] = useState(0);
   const [step, setStep]         = useState(0);
   const cbRef = useRef(onProgressDone);
@@ -322,6 +342,11 @@ function Scan({ onProgressDone }: { onProgressDone: () => void }) {
                 {SCAN_STEPS[step]}
               </p>
             </div>
+            {filename && (
+              <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate">
+                📎 {filename}
+              </p>
+            )}
           </div>
 
           {/* Progress bar */}
@@ -499,9 +524,10 @@ function Reveal({ data, onRescan }: { data: AnalysisResult; onRescan: () => void
 
 // ── App shell ────────────────────────────────────────────────────────────────
 export default function Home() {
-  const [phase, setPhase]     = useState<Phase>("splash");
-  const [opacity, setOpacity] = useState(1);
-  const [result, setResult]   = useState<AnalysisResult | null>(null);
+  const [phase, setPhase]           = useState<Phase>("splash");
+  const [opacity, setOpacity]       = useState(1);
+  const [result, setResult]         = useState<AnalysisResult | null>(null);
+  const [scannedFile, setScannedFile] = useState<ScannedFile | null>(null);
 
   const phaseRef     = useRef<Phase>("splash");
   const inTransition = useRef(false);
@@ -547,15 +573,21 @@ export default function Home() {
     if (apiDone.current) transitionTo("reveal");
   }, [transitionTo]);
 
+  const handleScan = useCallback((file: ScannedFile) => {
+    setScannedFile(file);
+    transitionTo("scanning");
+  }, [transitionTo]);
+
   const handleRescan = useCallback(() => {
     setResult(null);
+    setScannedFile(null);
     transitionTo("splash");
   }, [transitionTo]);
 
   return (
     <div style={{ opacity, transition: "opacity 0.3s ease" }}>
-      {phase === "splash"   && <Splash onScan={() => transitionTo("scanning")} />}
-      {phase === "scanning" && <Scan   onProgressDone={handleProgressDone} />}
+      {phase === "splash"   && <Splash onScan={handleScan} />}
+      {phase === "scanning" && <Scan   onProgressDone={handleProgressDone} filename={scannedFile?.name} />}
       {phase === "reveal"   && <Reveal data={result ?? FALLBACK} onRescan={handleRescan} />}
     </div>
   );
