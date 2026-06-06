@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 {
   "score": <integer 0-100, shopping health — 100 = perfect, lower = more leaks>,
   "leaks": [
-    { "name": "SHORT UPPERCASE LABEL", "amount": <integer monthly dollars>, "description": "<one specific sentence>" }
+    { "name": "SHORT UPPERCASE LABEL", "emoji": "<single most relevant emoji for this spending category>", "amount": <integer monthly dollars>, "description": "<one specific sentence>" }
   ],
   "totalFound": <integer monthly total>,
   "yearlyPotential": <integer yearly total>
@@ -58,6 +58,7 @@ Rules:
 - Return exactly 3 leaks, ordered largest to smallest
 - Be specific: reference item names, prices, or patterns from the data
 - score should reflect severity: ~70 for moderate leaks (~$300/mo)
+- emoji examples: 🧴 grooming, 🥤 drinks, 🍕 food, 🏪 convenience, 📦 duplicates, 🛒 impulse, 🧹 household, 🧦 clothing, 🍌 produce, ☕ coffee
 
 ${dataLabel}:
 ${dataText}`,

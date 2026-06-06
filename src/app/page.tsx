@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const RADIUS = 64;
+const RADIUS = 72;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const SCAN_STEPS = [
@@ -37,6 +37,7 @@ interface Leak {
   name: string;
   amount: number;
   description: string;
+  emoji?: string;
 }
 
 interface AnalysisResult {
@@ -66,9 +67,9 @@ interface HistoryScan {
 const FALLBACK: AnalysisResult = {
   score: 68,
   leaks: [
-    { name: "IMPULSE SPENDING",    amount: 214, description: "You spend most impulsively between 7–9 PM" },
-    { name: "CONVENIENCE TAX",     amount: 93,  description: "You pay 42% more for convenience items"   },
-    { name: "DUPLICATE PURCHASES", amount: 38,  description: "You rebuy items you already own"          },
+    { name: "IMPULSE SPENDING",    emoji: "🛒", amount: 214, description: "You spend most impulsively between 7–9 PM" },
+    { name: "CONVENIENCE TAX",     emoji: "🏪", amount: 93,  description: "You pay 42% more for convenience items"   },
+    { name: "DUPLICATE PURCHASES", emoji: "📦", amount: 38,  description: "You rebuy items you already own"          },
   ],
   totalFound: 345,
   yearlyPotential: 4140,
@@ -633,26 +634,45 @@ function History({ onNavTab }: { onNavTab: (tab: NavTab) => void }) {
 }
 
 // ── Reveal ───────────────────────────────────────────────────────────────────
+const LEAK_PALETTE = [
+  {
+    card:  "bg-red-950/30 border-red-500/20",
+    badge: "text-red-400 bg-red-500/15 border-red-500/30",
+    icon:  "bg-red-500/15",
+  },
+  {
+    card:  "bg-amber-950/30 border-amber-500/20",
+    badge: "text-amber-400 bg-amber-500/15 border-amber-500/30",
+    icon:  "bg-amber-500/15",
+  },
+  {
+    card:  "bg-yellow-950/25 border-yellow-500/20",
+    badge: "text-yellow-400 bg-yellow-500/15 border-yellow-500/30",
+    icon:  "bg-yellow-500/15",
+  },
+] as const;
+
 function LeakCard({ leak, index }: { leak: Leak; index: number }) {
-  const amount = useCountUp(leak.amount, 1000, 700 + index * 120);
-  const colors = ["text-red-400", "text-orange-400", "text-yellow-400"];
-  const rings  = ["ring-red-500/20", "ring-orange-500/20", "ring-yellow-500/20"];
+  const amount = useCountUp(leak.amount, 1000, 500 + index * 140);
+  const p = LEAK_PALETTE[Math.min(index, LEAK_PALETTE.length - 1)];
 
   return (
-    <div className={`bg-[#161616] rounded-2xl border border-white/[0.07] p-4 ring-1 ${rings[index]}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <span className="text-[11px] font-bold text-zinc-700 tabular-nums mt-0.5 flex-shrink-0">
-            {String(index + 1).padStart(2, "0")}
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-black tracking-wide text-white truncate">{leak.name.toUpperCase()}</p>
-            <p className="text-zinc-500 text-xs mt-1 leading-relaxed pr-2">{leak.description}</p>
-          </div>
+    <div
+      className={`rounded-2xl border p-4 backdrop-blur-xl ${p.card}`}
+      style={{ animation: `cardIn 0.55s cubic-bezier(0.34,1.56,0.64,1) ${380 + index * 130}ms both` }}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`${p.icon} w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0`}>
+          {leak.emoji ?? "💡"}
         </div>
-        <div className="flex-shrink-0 text-right">
-          <p className={`text-lg font-black tabular-nums leading-none ${colors[index]}`}>${amount}</p>
-          <p className="text-[10px] text-zinc-600 mt-0.5">/mo</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <p className="text-sm font-black tracking-wide text-white leading-tight">{leak.name}</p>
+            <div className={`flex-shrink-0 flex items-baseline gap-0.5 px-2.5 py-1 rounded-full border text-xs font-bold tabular-nums ${p.badge}`}>
+              ${amount}<span className="font-normal opacity-60 text-[10px]">/mo</span>
+            </div>
+          </div>
+          <p className="text-zinc-500 text-xs leading-relaxed">{leak.description}</p>
         </div>
       </div>
     </div>
@@ -671,127 +691,193 @@ function Reveal({
   onNavTab: (tab: NavTab) => void;
 }) {
   const [ready, setReady] = useState(false);
-  const scoreVal   = useCountUp(data.score,           1200, 350);
-  const monthlyVal = useCountUp(data.totalFound,      1300, 700);
-  const yearlyVal  = useCountUp(data.yearlyPotential, 1500, 700);
+  const scoreVal   = useCountUp(data.score,           1200, 300);
+  const monthlyVal = useCountUp(data.totalFound,      1300, 600);
+  const yearlyVal  = useCountUp(data.yearlyPotential, 1500, 600);
 
   useEffect(() => { setReady(true); }, []);
 
   const dashOffset = ready ? CIRCUMFERENCE * (1 - scoreVal / 100) : CIRCUMFERENCE;
+
   const scoreLabel =
-    scoreVal >= 80 ? "Good Shape" :
-    scoreVal >= 60 ? "Needs Improvement" : "High Risk";
+    scoreVal >= 75 ? "Good Shape"        :
+    scoreVal >= 55 ? "Needs Improvement" : "High Risk";
+
+  const scoreBadge =
+    scoreVal >= 75 ? "text-green-400 bg-green-500/10 border-green-500/25" :
+    scoreVal >= 55 ? "text-amber-400 bg-amber-500/10 border-amber-500/25" :
+                     "text-red-400   bg-red-500/10   border-red-500/25";
+
+  const glowColor =
+    scoreVal >= 70 ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent)"  :
+    scoreVal >= 45 ? "radial-gradient(circle, rgba(245,158,11,0.18), transparent)" :
+                     "radial-gradient(circle, rgba(239,68,68,0.18), transparent)";
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-white font-sans flex flex-col">
-      <div className="px-6 pt-14 pb-4 flex items-end justify-between border-b border-white/[0.07] flex-shrink-0">
-        <h1 className="text-lg font-black tracking-tight">RECEIPT DETECTIVE</h1>
-        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest self-end">Case File</span>
+    <div className="min-h-screen bg-[#080808] text-white font-sans flex flex-col relative">
+      {/* Ambient gradient orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-600/[0.06] rounded-full blur-[120px]" />
+        <div className="absolute top-2/3 -left-20 w-72 h-72 bg-violet-600/[0.04] rounded-full blur-[90px]" />
+        <div className="absolute bottom-20 right-0 w-56 h-56 bg-orange-500/[0.05] rounded-full blur-[80px]" />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-6 space-y-5 max-w-sm mx-auto">
-
-          {/* Receipt summary — only when a real image was scanned */}
-          {receipt && (
-            <div className="bg-[#161616] rounded-2xl border border-white/[0.07] p-4">
-              <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">
-                Receipt Scanned
-              </p>
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-base font-black text-white leading-none truncate">
-                    {receipt.storeName || "Unknown Store"}
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    {receipt.date} · {receipt.items.length} item{receipt.items.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <p className="text-lg font-black tabular-nums flex-shrink-0">
-                  ${typeof receipt.total === "number" ? receipt.total.toFixed(2) : "—"}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Score ring */}
-          <div className="bg-[#161616] rounded-3xl border border-white/[0.07] p-6 flex flex-col items-center">
-            <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-5">
-              Shopping Health Score
-            </p>
-            <div className="relative w-[172px] h-[172px]">
-              <svg width="172" height="172" viewBox="0 0 172 172" className="-rotate-90">
-                <circle cx="86" cy="86" r={RADIUS} fill="none" stroke="#1e1e1e" strokeWidth="8" />
-                <circle
-                  cx="86" cy="86" r={RADIUS}
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={CIRCUMFERENCE}
-                  strokeDashoffset={dashOffset}
-                  style={{ transition: ready ? "stroke-dashoffset 1.3s cubic-bezier(0.33,1,0.68,1)" : "none" }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex items-end leading-none gap-0.5">
-                  <span className="text-[48px] font-black tabular-nums leading-none">{scoreVal}</span>
-                  <span className="text-zinc-600 text-lg font-bold mb-2">/ 100</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-full px-4 py-1.5 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-              <span className="text-xs font-bold text-red-400 tracking-wide">{scoreLabel}</span>
-            </div>
-          </div>
-
-          {/* Findings */}
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-1">Findings</p>
-            <h2 className="text-xl font-black tracking-tight leading-tight">
-              Here&apos;s where your<br />money is leaking
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {data.leaks.map((leak, i) => <LeakCard key={leak.name} leak={leak} index={i} />)}
-          </div>
-
-          {/* Total */}
-          <div className="bg-[#161616] rounded-2xl border border-white/[0.07] p-5">
-            <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-4">Total Exposure</p>
-            <div className="space-y-3">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-zinc-400 font-medium">Monthly leaks</span>
-                <div className="flex items-end gap-1 leading-none">
-                  <span className="text-3xl font-black tabular-nums">${monthlyVal.toLocaleString()}</span>
-                  <span className="text-zinc-500 text-sm font-medium mb-0.5">/mo</span>
-                </div>
-              </div>
-              <div className="h-px bg-white/[0.07]" />
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-zinc-400 font-medium">Yearly savings potential</span>
-                <span className="text-xl font-black text-green-400 tabular-nums">
-                  ${yearlyVal.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={onRescan}
-            className="w-full bg-red-500 hover:bg-red-400 active:bg-red-600 text-white py-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-colors shadow-[0_4px_24px_rgba(239,68,68,0.3)]"
-          >
-            SCAN AGAIN
-          </button>
-
-          <div className="pb-2" />
+      <div className="relative z-10 flex flex-col flex-1">
+        <div className="px-6 pt-14 pb-4 flex items-end justify-between border-b border-white/[0.06] flex-shrink-0">
+          <h1 className="text-lg font-black tracking-tight">RECEIPT DETECTIVE</h1>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest self-end">Case File</span>
         </div>
-      </div>
 
-      <BottomNav active="scan" onTabChange={onNavTab} />
-      <div className="h-safe-bottom" />
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-6 space-y-4 max-w-sm mx-auto">
+
+            {/* Score ring */}
+            <div
+              className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.07] rounded-3xl p-6 flex flex-col items-center"
+              style={{ animation: "cardIn 0.6s cubic-bezier(0.34,1.56,0.64,1) 0ms both" }}
+            >
+              <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-5">
+                Financial Health Score
+              </p>
+              <div className="relative w-[212px] h-[212px]">
+                {/* Score glow orb */}
+                <div
+                  className="absolute inset-10 rounded-full blur-3xl transition-all duration-1000"
+                  style={{ background: glowColor }}
+                />
+                <svg width="212" height="212" viewBox="0 0 212 212" className="-rotate-90">
+                  <defs>
+                    <linearGradient id="ringGrad" x1="106" y1="24" x2="106" y2="188" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%"   stopColor="#ef4444" />
+                      <stop offset="45%"  stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#22c55e" />
+                    </linearGradient>
+                  </defs>
+                  {/* Track */}
+                  <circle cx="106" cy="106" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="11" />
+                  {/* Gradient arc */}
+                  <circle
+                    cx="106" cy="106" r={RADIUS}
+                    fill="none"
+                    stroke="url(#ringGrad)"
+                    strokeWidth="11"
+                    strokeLinecap="round"
+                    strokeDasharray={CIRCUMFERENCE}
+                    strokeDashoffset={dashOffset}
+                    style={{ transition: ready ? "stroke-dashoffset 1.3s cubic-bezier(0.33,1,0.68,1)" : "none" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                  <span className="text-[54px] font-black tabular-nums leading-none">{scoreVal}</span>
+                  <span className="text-zinc-600 text-xs font-semibold tracking-widest uppercase">out of 100</span>
+                </div>
+              </div>
+              <div className={`mt-4 border rounded-full px-4 py-1.5 flex items-center gap-2 ${scoreBadge}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                <span className="text-xs font-bold tracking-wide">{scoreLabel}</span>
+              </div>
+              <div className="flex items-center gap-8 mt-5 pt-4 border-t border-white/[0.06] w-full justify-center">
+                <div className="text-center">
+                  <p className="text-[9px] text-zinc-600 uppercase tracking-[0.2em] font-bold mb-1">Monthly Leaks</p>
+                  <p className="text-xl font-black tabular-nums text-red-400">${monthlyVal.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-8 bg-white/[0.07]" />
+                <div className="text-center">
+                  <p className="text-[9px] text-zinc-600 uppercase tracking-[0.2em] font-bold mb-1">Leaks Found</p>
+                  <p className="text-xl font-black tabular-nums">{data.leaks.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Receipt summary */}
+            {receipt && (
+              <div
+                className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.07] rounded-2xl p-4"
+                style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 100ms both" }}
+              >
+                <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-2">Receipt Scanned</p>
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-base font-black text-white leading-none truncate">
+                      {receipt.storeName || "Unknown Store"}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {receipt.date} · {receipt.items.length} item{receipt.items.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <p className="text-lg font-black tabular-nums flex-shrink-0">
+                    ${typeof receipt.total === "number" ? receipt.total.toFixed(2) : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Section header */}
+            <div style={{ animation: "cardIn 0.45s ease-out 180ms both" }}>
+              <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-1">Spending Leaks Detected</p>
+              <h2 className="text-xl font-black tracking-tight leading-tight">
+                Here&apos;s where your<br />money is leaking
+              </h2>
+            </div>
+
+            {/* Leak cards */}
+            <div className="space-y-3">
+              {data.leaks.map((leak, i) => <LeakCard key={leak.name} leak={leak} index={i} />)}
+            </div>
+
+            {/* Total exposure */}
+            <div
+              className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.07] rounded-2xl p-5"
+              style={{ animation: `cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) ${400 + data.leaks.length * 130 + 80}ms both` }}
+            >
+              <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-4">Total Exposure</p>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-zinc-400 font-medium">Monthly leaks</span>
+                  <div className="flex items-end gap-1 leading-none">
+                    <span
+                      className="text-3xl font-black tabular-nums"
+                      style={{ background: "linear-gradient(135deg, #f87171, #fb923c)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                    >
+                      ${monthlyVal.toLocaleString()}
+                    </span>
+                    <span className="text-zinc-500 text-sm font-medium mb-0.5">/mo</span>
+                  </div>
+                </div>
+                <div className="h-px bg-white/[0.06]" />
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-zinc-400 font-medium">Yearly savings potential</span>
+                  <span
+                    className="text-xl font-black tabular-nums"
+                    style={{ background: "linear-gradient(135deg, #4ade80, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                  >
+                    ${yearlyVal.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Gradient border button */}
+            <div
+              className="relative p-[1px] rounded-2xl overflow-hidden"
+              style={{ animation: `cardIn 0.5s ease-out ${400 + data.leaks.length * 130 + 200}ms both` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-orange-500 to-amber-400" />
+              <button
+                onClick={onRescan}
+                className="relative w-full bg-[#080808] hover:bg-[#0f0f0f] active:bg-[#050505] text-white py-[18px] rounded-[15px] font-bold text-sm tracking-widest uppercase transition-colors"
+              >
+                SCAN ANOTHER
+              </button>
+            </div>
+
+            <div className="pb-2" />
+          </div>
+        </div>
+
+        <BottomNav active="scan" onTabChange={onNavTab} />
+        <div className="h-safe-bottom" />
+      </div>
     </div>
   );
 }
