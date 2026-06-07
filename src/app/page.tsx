@@ -226,13 +226,45 @@ async function saveScanToDb(
   analysis: AnalysisResult,
   imageBase64?: string,
 ) {
+  console.log("[saveScanToDb] starting — store:", receipt?.storeName, "| score:", analysis.score, "| savings:", analysis.totalSavings);
+  console.log("[saveScanToDb] Supabase URL defined:", !!process.env.NEXT_PUBLIC_SUPABASE_URL, "| Key defined:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+  const receiptRow = {
+    store_name:   receipt?.storeName   ?? null,
+    receipt_date: receipt?.date        ?? null,
+    items:        receipt?.items       ?? null,
+    total:        receipt?.total       ?? null,
+    image_base64: imageBase64          ?? null,
+  };
+  console.log("[saveScanToDb] inserting receipt row:", { ...receiptRow, image_base64: receiptRow.image_base64 ? "(truncated)" : null });
+
   const { data, error } = await supabase
     .from("receipts")
-    .insert({ store_name: receipt?.storeName ?? null, receipt_date: receipt?.date ?? null, items: receipt?.items ?? null, total: receipt?.total ?? null, image_base64: imageBase64 ?? null })
-    .select("id").single();
-  if (error) throw error;
-  const { error: aErr } = await supabase.from("analyses").insert({ receipt_id: data.id, leaks: analysis.categories, total_found: analysis.totalSavings, yearly_potential: analysis.yearlySavings, score: analysis.score });
-  if (aErr) throw aErr;
+    .insert(receiptRow)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[saveScanToDb] receipts INSERT failed:", error.message, "| code:", error.code, "| details:", error.details, "| hint:", error.hint);
+    throw error;
+  }
+  console.log("[saveScanToDb] receipt saved, id:", data.id);
+
+  const analysisRow = {
+    receipt_id:       data.id,
+    leaks:            analysis.categories,
+    total_found:      analysis.totalSavings,
+    yearly_potential: analysis.yearlySavings,
+    score:            analysis.score,
+  };
+  console.log("[saveScanToDb] inserting analysis row:", { ...analysisRow, leaks: `[${analysisRow.leaks.length} categories]` });
+
+  const { error: aErr } = await supabase.from("analyses").insert(analysisRow);
+  if (aErr) {
+    console.error("[saveScanToDb] analyses INSERT failed:", aErr.message, "| code:", aErr.code, "| details:", aErr.details, "| hint:", aErr.hint);
+    throw aErr;
+  }
+  console.log("[saveScanToDb] analysis saved successfully ✓");
 }
 
 // ── Spy illustration ──────────────────────────────────────────────────────────
@@ -708,113 +740,123 @@ function Dashboard({
           </div>
         </div>
 
-        {/* Empty state (below hero) */}
-        {isEmpty && !loading && (
-          <div className="text-center py-4" style={{ animation: "cardIn 0.5s ease-out 180ms both" }}>
-            <SpyCharacter className="w-16 h-auto mx-auto opacity-25" />
-            <p className="text-zinc-600 text-xs mt-2">No cases on file yet.</p>
+        {/* ③ Stats row — always visible */}
+        <div
+          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 160ms both" }}
+        >
+          <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
+            <StatCell target={data?.totalSavings ?? 0}      prefix="$" label="Total Saved"  />
+            <StatCell target={data?.receiptsScanned ?? 0}   round       label="Cases Solved" />
+            {data && data.receiptsScanned > 0
+              ? <StatCell target={data.avgScore} round label="Avg Score" />
+              : <div className="flex flex-col items-center py-4 px-2">
+                  <p className="text-[17px] font-black text-zinc-600 leading-none">—</p>
+                  <p className="text-[9px] text-zinc-500 mt-1.5 font-medium text-center leading-tight">Avg Score</p>
+                </div>
+            }
           </div>
-        )}
+        </div>
 
-        {/* ③–⑥ data widgets */}
-        {!loading && data && data.receiptsScanned > 0 && (
-          <>
-            {/* ③ Stats row */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 160ms both" }}
-            >
-              <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
-                <StatCell target={data.totalSavings} prefix="$"  label="Total Saved"  />
-                <StatCell target={data.receiptsScanned} round     label="Cases Solved" />
-                <StatCell target={data.avgScore}         round     label="Avg Score"    />
-              </div>
+        {/* ④ Store Rankings — always visible */}
+        <div
+          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 240ms both" }}
+        >
+          <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">Store Rankings</p>
+          {(!data || data.receiptsScanned === 0) ? (
+            <div className="px-4 pb-4 pt-1 flex items-center gap-3 opacity-40">
+              <span className="text-lg">🏆</span>
+              <span className="text-xs text-zinc-500 italic">Scan receipts to unlock store rankings</span>
             </div>
-
-            {/* ④ Store Rankings */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 240ms both" }}
-            >
-              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">Store Rankings</p>
-              <div className="divide-y divide-white/[0.05]">
-                {MEDALS.map((medal, i) => {
-                  const store = data.storeRankings[i];
-                  if (!store) return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3 opacity-40">
-                      <span className="text-lg">{medal}</span>
-                      <span className="text-xs text-zinc-600 italic">Scan more to unlock</span>
-                    </div>
-                  );
-                  return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3">
-                      <span className="text-lg flex-shrink-0">{medal}</span>
-                      <span className="flex-1 text-sm font-bold text-white truncate">{store.name}</span>
-                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${scorePillClass(store.avgScore)}`}>
-                        {store.avgScore}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+          ) : (
+            <div className="divide-y divide-white/[0.05]">
+              {MEDALS.map((medal, i) => {
+                const store = data.storeRankings[i];
+                if (!store) return (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 opacity-40">
+                    <span className="text-lg">{medal}</span>
+                    <span className="text-xs text-zinc-600 italic">Scan more to unlock</span>
+                  </div>
+                );
+                return (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <span className="text-lg flex-shrink-0">{medal}</span>
+                    <span className="flex-1 text-sm font-bold text-white truncate">{store.name}</span>
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${scorePillClass(store.avgScore)}`}>
+                      {store.avgScore}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </div>
 
-            {/* ⑤ Recent Cases */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 320ms both" }}
-            >
-              <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">Recent Cases</p>
-                <button onClick={onViewHistory} className="text-[11px] font-bold text-violet-400 hover:text-violet-300 transition-colors">
-                  View All →
-                </button>
-              </div>
-              <div className="divide-y divide-white/[0.05]">
-                {data.recentCases.map((scan) => {
-                  const analysis = scan.analyses?.[0];
-                  return (
-                    <button
-                      key={scan.id}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
-                      onClick={() => analysis && onViewResult(analysisFromDb(analysis))}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{scan.store_name || "Unknown Store"}</p>
-                        <p className="text-xs text-zinc-600 mt-0.5">
-                          {new Date(scan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </p>
+        {/* ⑤ Recent Cases — always visible */}
+        <div
+          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 320ms both" }}
+        >
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">Recent Cases</p>
+            {data && data.receiptsScanned > 0 && (
+              <button onClick={onViewHistory} className="text-[11px] font-bold text-violet-400 hover:text-violet-300 transition-colors">
+                View All →
+              </button>
+            )}
+          </div>
+          {(!data || data.recentCases.length === 0) ? (
+            <div className="px-4 pb-4 pt-1 opacity-40">
+              <p className="text-xs text-zinc-500 italic">No cases yet — scan your first receipt above</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/[0.05]">
+              {data.recentCases.map((scan) => {
+                const analysis = scan.analyses?.[0];
+                return (
+                  <button
+                    key={scan.id}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
+                    onClick={() => analysis && onViewResult(analysisFromDb(analysis))}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{scan.store_name || "Unknown Store"}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5">
+                        {new Date(scan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                    </div>
+                    {analysis && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${scorePillClass(analysis.score)}`}>{analysis.score}</span>
                       </div>
-                      {analysis && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${scorePillClass(analysis.score)}`}>{analysis.score}</span>
-                        </div>
-                      )}
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-700 flex-shrink-0">
-                        <path d="M9 18l6-6-6-6" />
-                      </svg>
-                    </button>
-                  );
-                })}
-              </div>
+                    )}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-700 flex-shrink-0">
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </button>
+                );
+              })}
             </div>
+          )}
+        </div>
 
-            {/* ⑥ Smart Insight */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex gap-3 items-start"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 400ms both" }}
-            >
-              <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 text-base leading-none">
-                💡
-              </div>
-              <div>
-                <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Smart Insight</p>
-                <p className="text-sm text-zinc-300 leading-relaxed">{data.insight}</p>
-              </div>
-            </div>
-          </>
-        )}
+        {/* ⑥ Smart Insight — always visible */}
+        <div
+          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex gap-3 items-start"
+          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 400ms both" }}
+        >
+          <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 text-base leading-none">
+            💡
+          </div>
+          <div>
+            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Smart Insight</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">
+              {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -987,7 +1029,7 @@ export default function Home() {
         resultRef.current = raw as AnalysisResult;
         setResult(raw as AnalysisResult);
         ok = true;
-        saveScanToDb(extracted, raw as AnalysisResult, scannedFile?.base64).catch(err => console.warn("Supabase save failed:", err));
+        saveScanToDb(extracted, raw as AnalysisResult, scannedFile?.base64).catch(err => console.error("[scan] Supabase save FAILED:", err));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
         console.error("[scan] pipeline error:", err);
