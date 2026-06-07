@@ -741,8 +741,8 @@ function Dashboard({ data, loading, onScan }: {
         )}
       </motion.div>
 
-      {/* ② SCAN NOW — hero, takes remaining flex space */}
-      <motion.div variants={cardV} className="relative flex-1 min-h-[160px]">
+      {/* ② SCAN NOW — hero, takes remaining flex space, capped so it doesn't tower on large phones */}
+      <motion.div variants={cardV} className="relative flex-1 min-h-[140px] max-h-[50dvh]">
         <div className="absolute inset-0 rounded-[22px] pointer-events-none"
           style={{ background: "radial-gradient(ellipse at 50% 70%, rgba(109,40,217,0.55) 0%, transparent 68%)", filter: "blur(18px)" }} />
         <motion.div
@@ -793,8 +793,8 @@ function Dashboard({ data, loading, onScan }: {
       <motion.div variants={staggerV} className="grid grid-cols-2 gap-2 flex-shrink-0">
 
         <motion.div variants={cardV}
-          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
-          style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)" }}>
+          className="rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
+          style={{ height: "min(9vh, 76px)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)" }}>
           <p className="text-[8px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
           <p className="text-[22px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_10px_rgba(34,197,94,0.4)]">
             <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
@@ -802,8 +802,8 @@ function Dashboard({ data, loading, onScan }: {
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
-          style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)" }}>
+          className="rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
+          style={{ height: "min(9vh, 76px)", background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)" }}>
           <p className="text-[8px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
           <p className="text-[26px] font-black tabular-nums leading-none"
             style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
@@ -812,8 +812,8 @@ function Dashboard({ data, loading, onScan }: {
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}>
+          className="rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
+          style={{ height: "min(9vh, 76px)", background: "rgba(255,255,255,0.045)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}>
           <p className="text-[8px] font-bold tracking-[0.18em] text-zinc-400/70 uppercase">Avg Score</p>
           {hasData
             ? <p className={`text-[26px] font-black tabular-nums leading-none ${scoreColor}`}>
@@ -823,8 +823,8 @@ function Dashboard({ data, loading, onScan }: {
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
-          style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)" }}>
+          className="rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
+          style={{ height: "min(9vh, 76px)", background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)" }}>
           <p className="text-[8px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
           <div className="flex items-end gap-1">
             <span className="text-[15px] leading-none">🔥</span>

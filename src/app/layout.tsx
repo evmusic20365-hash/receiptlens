@@ -38,7 +38,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${hanken.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+      <body className="h-full overflow-hidden flex flex-col">
         <ServiceWorkerRegistrar />
         {children}
       </body>
