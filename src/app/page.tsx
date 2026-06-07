@@ -992,6 +992,121 @@ function SettingsTab({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+// ── Profile completion modal (shown after first scan if profile is incomplete) ─
+function ProfileModal({ open, onSave, onSkip }: {
+  open: boolean;
+  onSave: (name: string, birthday: string) => Promise<void>;
+  onSkip: () => void;
+}) {
+  const [name,     setName]     = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!name.trim() || !birthday) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(name.trim(), birthday);
+    } catch {
+      setError("Couldn't save — please try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <BottomSheet open={open} onOpenChange={v => { if (!v) onSkip(); }}>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-violet-600/[0.07] rounded-full blur-[80px]" />
+      </div>
+
+      {/* Handle + label */}
+      <div className="relative z-10 flex-shrink-0 pt-3 px-5 pb-4 border-b border-white/[0.06]">
+        <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3" />
+        <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase text-center">Detective Profile</p>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="relative z-10 flex-1 overflow-y-auto">
+        <div className="px-5 py-6 flex flex-col gap-5 max-w-sm mx-auto pb-8">
+
+          {/* Celebrating mascot */}
+          <div className="flex justify-center">
+            <motion.img
+              src="/mascot-celebrating.png"
+              alt=""
+              className="w-[110px] h-[110px] object-contain drop-shadow-[0_0_32px_rgba(139,92,246,0.5)]"
+              initial={{ scale: 0.75, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.45, type: "spring", damping: 14 }}
+            />
+          </div>
+
+          {/* Copy */}
+          <div className="text-center flex flex-col gap-1.5">
+            <p className="text-[10px] font-bold tracking-[0.28em] text-violet-400 uppercase">Great case! 🎉</p>
+            <h2 className="text-[22px] font-black text-white leading-snug">Want to save your<br />profile?</h2>
+            <p className="text-[13px] text-zinc-500 leading-snug">10 seconds. Powers better insights and a personalized experience.</p>
+          </div>
+
+          {/* Fields */}
+          <div className="flex flex-col gap-3">
+            <input
+              type="text"
+              placeholder="Your name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              autoComplete="name"
+              className="w-full rounded-xl px-4 py-3.5 text-[14px] text-white placeholder-zinc-600 outline-none focus:shadow-[0_0_0_1.5px_rgba(167,139,250,0.5)] transition-shadow"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+            />
+            <input
+              type="date"
+              value={birthday}
+              onChange={e => setBirthday(e.target.value)}
+              max={new Date().toISOString().split("T")[0]}
+              className="w-full rounded-xl px-4 py-3.5 text-[14px] text-white outline-none focus:shadow-[0_0_0_1.5px_rgba(167,139,250,0.5)] transition-shadow"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", colorScheme: "dark" }}
+            />
+          </div>
+
+          {error && (
+            <p className="text-[12px] text-red-400 bg-red-500/[0.08] rounded-xl px-3 py-2.5 border border-red-500/20 leading-snug">
+              {error}
+            </p>
+          )}
+
+          {/* Save */}
+          <motion.button
+            onClick={handleSave}
+            disabled={!name.trim() || !birthday || saving}
+            whileTap={{ scale: 0.97 }}
+            className="w-full py-4 rounded-2xl font-black text-[13px] tracking-widest uppercase text-white disabled:opacity-40"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 24px rgba(124,58,237,0.4)" }}
+          >
+            {saving
+              ? <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                  Saving…
+                </span>
+              : "Save Profile"}
+          </motion.button>
+
+          {/* Skip */}
+          <button
+            onClick={onSkip}
+            className="text-center text-[13px] text-zinc-600 hover:text-zinc-400 transition-colors py-1"
+          >
+            Skip for now — I&apos;ll do this later
+          </button>
+
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
 // ── App shell ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const router = useRouter();
@@ -1006,20 +1121,17 @@ export default function Home() {
       if (!session) { router.push("/login"); return; }
 
       setSession(session);
+      userIdRef.current = session.user.id;
 
-      // Redirect to onboarding if profile is incomplete (no name or birthday).
-      // Treat fetch errors as "complete" so a missing profiles table doesn't block the app.
+      // Silently check profile completeness — used to trigger post-scan profile modal.
+      // Errors (e.g. table not yet created) are treated as complete to avoid blocking the app.
       const { data: profile } = await supabase
         .from("profiles")
         .select("name, birthday")
         .eq("id", session.user.id)
         .maybeSingle();
 
-      if (profile !== null && (!profile?.name || !profile?.birthday)) {
-        router.push("/onboarding");
-        return;
-      }
-
+      profileCompleteRef.current = !!(profile?.name && profile?.birthday);
       setAuthChecked(true);
     };
 
@@ -1047,6 +1159,10 @@ export default function Home() {
   const [refreshKey,  setRefreshKey]  = useState(0);
 
   const { data: dashData, loading: dashLoading } = useDashboardData(refreshKey);
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const profileCompleteRef = useRef(true);
+  const userIdRef          = useRef<string | null>(null);
 
   const progressDone = useRef(false);
   const apiDone      = useRef(false);
@@ -1107,9 +1223,22 @@ export default function Home() {
 
   const handleScan        = useCallback((file: ScannedFile) => { if (scanning) return; setScannedFile(file); setReceiptData(null); setScanError(null); setScanning(true); }, [scanning]);
   const handleRetry       = useCallback(() => { setScanning(false); setScanError(null); setScannedFile(null); }, []);
-  const handleCloseResult = useCallback(() => { setShowResult(false); setRefreshKey(k => k + 1); }, []);
+  const handleCloseResult = useCallback(() => {
+    setShowResult(false);
+    setRefreshKey(k => k + 1);
+    if (!profileCompleteRef.current) setShowProfileModal(true);
+  }, []);
   const handleViewHistory = useCallback(() => setActiveTab("history"), []);
   const handleViewResult  = useCallback((r: AnalysisResult) => { setResult(r); setShowResult(true); }, []);
+
+  const handleSaveProfile = useCallback(async (name: string, birthday: string) => {
+    if (!userIdRef.current) return;
+    await supabase.from("profiles").upsert({ id: userIdRef.current, name, birthday });
+    profileCompleteRef.current = true;
+    setShowProfileModal(false);
+  }, []);
+
+  const handleSkipProfile = useCallback(() => setShowProfileModal(false), []);
 
   // Show spinner while checking session (prevents flash of dashboard before redirect)
   if (!authChecked) {
@@ -1163,6 +1292,12 @@ export default function Home() {
         data={result ?? FALLBACK}
         receipt={receiptData}
         onClose={handleCloseResult}
+      />
+
+      <ProfileModal
+        open={showProfileModal}
+        onSave={handleSaveProfile}
+        onSkip={handleSkipProfile}
       />
     </div>
   );
