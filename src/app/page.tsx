@@ -712,7 +712,7 @@ function Dashboard({ data, loading, onScan }: {
   };
 
   const [tip, setTip] = useState<string>(QUICK_TIPS[0]);
-  useEffect(() => { setTip(QUICK_TIPS[new Date().getDay() % QUICK_TIPS.length]); }, []);
+  useEffect(() => { setTip(QUICK_TIPS[Math.floor(Math.random() * QUICK_TIPS.length)]); }, []);
 
   const rank    = data?.avgScore != null ? detectiveRank(data.avgScore) : null;
   const hasData = !!data && data.receiptsScanned > 0;
