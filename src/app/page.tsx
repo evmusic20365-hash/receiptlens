@@ -225,49 +225,6 @@ async function saveScanToDb(receipt: ExtractedReceipt | null, analysis: Analysis
   console.log("[saveScanToDb] analysis saved successfully ✓");
 }
 
-// ── Spy illustration ──────────────────────────────────────────────────────────
-function SpyCharacter({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M66 74 C66 44 78 20 100 18 C122 20 134 44 134 74" fill="#111" />
-      <ellipse cx="100" cy="76" rx="58" ry="13" fill="#111" />
-      <path d="M68 66 Q100 60 132 66" stroke="#8b5cf6" strokeWidth="5" strokeLinecap="round" />
-      <path d="M80 44 Q100 38 120 44" stroke="#222" strokeWidth="1.5" fill="none" />
-      <ellipse cx="100" cy="112" rx="36" ry="40" fill="#fde8c8" stroke="#111" strokeWidth="2.5" />
-      <ellipse cx="84" cy="104" rx="10" ry="11" fill="white" stroke="#111" strokeWidth="2" />
-      <circle cx="87" cy="106" r="5.5" fill="#111" /><circle cx="89" cy="104" r="2" fill="white" />
-      <ellipse cx="116" cy="104" rx="10" ry="11" fill="white" stroke="#111" strokeWidth="2" />
-      <circle cx="119" cy="106" r="5.5" fill="#111" /><circle cx="121" cy="104" r="2" fill="white" />
-      <path d="M75 91 Q84 86 93 91" stroke="#7c5c38" strokeWidth="3" strokeLinecap="round" fill="none" />
-      <path d="M107 91 Q116 86 125 91" stroke="#7c5c38" strokeWidth="3" strokeLinecap="round" fill="none" />
-      <path d="M97 118 Q100 123 103 118" stroke="#c4956a" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      <path d="M87 129 Q96 135 108 128" stroke="#111" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      <path d="M106 128 Q111 124 109 130" stroke="#111" strokeWidth="2" strokeLinecap="round" fill="none" />
-      <rect x="93" y="149" width="14" height="10" fill="#fde8c8" />
-      <path d="M85 155 L100 164 L115 155" fill="#f3f4f6" stroke="#111" strokeWidth="1.5" />
-      <path d="M100 162 L96 180 L100 190 L104 180 Z" fill="#8b5cf6" stroke="#111" strokeWidth="1.5" />
-      <ellipse cx="100" cy="164" rx="5" ry="4" fill="#7c3aed" stroke="#111" strokeWidth="1.5" />
-      <path d="M60 158 L140 158 L152 238 H48 Z" fill="#1e2535" stroke="#111" strokeWidth="2.5" />
-      <path d="M100 162 L77 180 L64 210" stroke="#d1d5db" strokeWidth="2" fill="none" />
-      <path d="M100 162 L123 180 L136 210" stroke="#d1d5db" strokeWidth="2" fill="none" />
-      <rect x="50" y="200" width="100" height="10" rx="4" fill="#374151" stroke="#4b5563" strokeWidth="1.5" />
-      <rect x="91" y="198" width="18" height="14" rx="3" fill="#6b7280" stroke="#4b5563" strokeWidth="1.5" />
-      <rect x="95" y="202" width="10" height="6" rx="1.5" fill="#4b5563" />
-      <circle cx="100" cy="220" r="3" fill="#374151" stroke="#4b5563" strokeWidth="1.5" />
-      <circle cx="100" cy="234" r="3" fill="#374151" stroke="#4b5563" strokeWidth="1.5" />
-      <path d="M64 168 L38 218" stroke="#1e2535" strokeWidth="18" strokeLinecap="round" />
-      <ellipse cx="36" cy="221" rx="10" ry="9" fill="#fde8c8" stroke="#111" strokeWidth="2" />
-      <path d="M136 168 L160 140" stroke="#1e2535" strokeWidth="18" strokeLinecap="round" />
-      <ellipse cx="162" cy="138" rx="9" ry="10" fill="#fde8c8" stroke="#111" strokeWidth="2" />
-      <circle cx="174" cy="116" r="27" fill="rgba(139,92,246,0.08)" stroke="#111" strokeWidth="3.5" />
-      <circle cx="174" cy="116" r="22" fill="none" stroke="#374151" strokeWidth="1" />
-      <path d="M161 105 Q170 99 181 103" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
-      <line x1="193" y1="135" x2="200" y2="152" stroke="#8b5cf6" strokeWidth="8" strokeLinecap="round" />
-      <ellipse cx="80" cy="239" rx="18" ry="7" fill="#0f172a" stroke="#111" strokeWidth="1.5" />
-      <ellipse cx="120" cy="239" rx="18" ry="7" fill="#0f172a" stroke="#111" strokeWidth="1.5" />
-    </svg>
-  );
-}
 
 // ── Bottom sheet (radix dialog + framer-motion) ───────────────────────────────
 function BottomSheet({ open, onOpenChange, children }: {
@@ -388,7 +345,13 @@ function Scan({ onProgressDone, filename, error, onRetry }: {
         <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">{error ? "Error" : "On The Case"}</span>
       </div>
       <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-8">
-        <SpyCharacter className="w-28 h-auto opacity-90" />
+        <motion.img
+          src="/mascot.png"
+          alt="Detective scanning"
+          className="w-[200px] h-[200px] object-contain"
+          animate={{ y: [0, -12, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        />
         <div className="w-full max-w-sm space-y-5">
           {error ? (
             <>
@@ -735,8 +698,9 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
         {/* ① Greeting */}
-        <motion.div variants={cardV} className="flex items-center gap-2 min-h-[40px]">
-          <span className="text-[22px] font-black text-white leading-none">Hey Detective 🕵️</span>
+        <motion.div variants={cardV} className="flex items-center gap-3 min-h-[40px]">
+          <img src="/mascot.png" alt="Detective" className="w-[60px] h-[60px] object-contain flex-shrink-0" />
+          <span className="text-[22px] font-black text-white leading-none">Hey Detective</span>
           {rank && (
             <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
               {rank}
@@ -898,8 +862,9 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
               )}
             </div>
             {(!data || data.recentCases.length === 0) ? (
-              <div className="px-5 pb-5 pt-1 opacity-40">
-                <p className="text-sm text-zinc-500 italic">No cases yet — scan your first receipt above</p>
+              <div className="px-5 pb-6 pt-2 flex flex-col items-center gap-3 opacity-50">
+                <img src="/mascot.png" alt="Detective" className="w-[120px] h-[120px] object-contain" />
+                <p className="text-sm text-zinc-500 italic text-center">No cases yet — scan your first receipt above</p>
               </div>
             ) : (
               <div className="divide-y divide-white/[0.05]">
@@ -977,8 +942,8 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
   );
 
   if (!scans.length) return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
-      <SpyCharacter className="w-20 h-auto opacity-30" />
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <img src="/mascot.png" alt="Detective" className="w-[120px] h-[120px] object-contain opacity-50" />
       <p className="text-zinc-400 font-bold">No cases yet.</p>
       <p className="text-zinc-600 text-sm">Scan your first receipt on the Home tab.</p>
     </div>
