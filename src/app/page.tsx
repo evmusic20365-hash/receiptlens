@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -945,7 +947,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
   );
 }
 
-function SettingsTab() {
+function SettingsTab({ onLogout }: { onLogout: () => void }) {
   const [notif, setNotif] = useState(true);
   const [dark,  setDark]  = useState(true);
   return (
@@ -975,6 +977,16 @@ function SettingsTab() {
             <p className="text-[13px] text-zinc-600 leading-relaxed">Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.</p>
           </Card>
         </motion.div>
+        <motion.div variants={cardV}>
+          <motion.button
+            onClick={onLogout}
+            whileTap={{ scale: 0.97 }}
+            className="w-full py-4 rounded-2xl font-black text-[13px] tracking-widest uppercase text-red-400"
+            style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)", backdropFilter: "blur(20px)" }}
+          >
+            Sign Out
+          </motion.button>
+        </motion.div>
       </motion.div>
     </div>
   );
@@ -982,6 +994,30 @@ function SettingsTab() {
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 export default function Home() {
+  const router = useRouter();
+
+  // ── Auth guard ───────────────────────────────────────────────────────────────
+  const [session,     setSession]     = useState<Session | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthChecked(true);
+      if (!data.session) router.push("/login");
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s);
+      if (!s) router.push("/login");
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    // onAuthStateChange handles the redirect
+  }, []);
+
   const [activeTab,   setActiveTab]   = useState<NavTab>("home");
   const [scanning,    setScanning]    = useState(false);
   const [result,      setResult]      = useState<AnalysisResult | null>(null);
@@ -1056,6 +1092,18 @@ export default function Home() {
   const handleViewHistory = useCallback(() => setActiveTab("history"), []);
   const handleViewResult  = useCallback((r: AnalysisResult) => { setResult(r); setShowResult(true); }, []);
 
+  // Show spinner while checking session (prevents flash of dashboard before redirect)
+  if (!authChecked) {
+    return (
+      <div className="h-[100dvh] flex items-center justify-center" style={NAVY}>
+        <div className="w-8 h-8 border-2 border-white/10 border-t-violet-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Session confirmed — render dashboard
+  void session; // used for logout trigger via onAuthStateChange
+
   return (
     <div className="h-[100dvh] text-white font-sans flex flex-col overflow-hidden" style={NAVY}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
@@ -1072,7 +1120,7 @@ export default function Home() {
             className="flex-1 flex flex-col overflow-hidden">
             {activeTab === "home"     && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} />}
             {activeTab === "history"  && <HistoryTab onViewResult={handleViewResult} />}
-            {activeTab === "settings" && <SettingsTab />}
+            {activeTab === "settings" && <SettingsTab onLogout={handleLogout} />}
           </motion.div>
         </AnimatePresence>
       </div>
