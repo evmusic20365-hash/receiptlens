@@ -1001,11 +1001,30 @@ export default function Home() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push("/login"); return; }
+
+      setSession(session);
+
+      // Redirect to onboarding if profile is incomplete (no name or birthday).
+      // Treat fetch errors as "complete" so a missing profiles table doesn't block the app.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, birthday")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (profile !== null && (!profile?.name || !profile?.birthday)) {
+        router.push("/onboarding");
+        return;
+      }
+
       setAuthChecked(true);
-      if (!data.session) router.push("/login");
-    });
+    };
+
+    check();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
       setSession(s);
       if (!s) router.push("/login");
