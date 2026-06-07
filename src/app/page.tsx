@@ -515,16 +515,47 @@ function CategoryCard({ category, index }: { category: Category; index: number }
   );
 }
 
-// ── Count-up stat cell ────────────────────────────────────────────────────────
-function StatCell({ target, prefix = "", round = false, label }: { target: number; prefix?: string; round?: boolean; label: string }) {
+// ── Count-up value span ───────────────────────────────────────────────────────
+function CountUpValue({ target, prefix = "", round = false, className = "" }: {
+  target: number; prefix?: string; round?: boolean; className?: string;
+}) {
   const v = useCountUp(target, 900, 300);
+  return <span className={className}>{prefix}{round ? Math.round(v) : v.toFixed(2)}</span>;
+}
+
+// ── Avg score mini ring widget ────────────────────────────────────────────────
+function AvgScoreWidget({ score, hasData }: { score: number; hasData: boolean }) {
+  const [ready, setReady] = useState(false);
+  const val = useCountUp(score, 900, 300);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const r = 38;
+  const c = 2 * Math.PI * r;
+  const dashOffset = ready && hasData ? c * (1 - val / 100) : c;
+  const stroke  = val >= 75 ? "#22c55e" : val >= 55 ? "#f59e0b" : "#ef4444";
+  const textCls = val >= 75 ? "text-green-400" : val >= 55 ? "text-amber-400" : "text-red-400";
+
   return (
-    <div className="flex flex-col items-center py-4 px-2">
-      <p className="text-[17px] font-black tabular-nums text-white leading-none">
-        {prefix}{round ? Math.round(v) : v.toFixed(2)}
-      </p>
-      <p className="text-[9px] text-zinc-500 mt-1.5 font-medium text-center leading-tight">{label}</p>
-    </div>
+    <>
+      <div className="relative w-[88px] h-[88px]">
+        <svg width="88" height="88" viewBox="0 0 88 88" className="-rotate-90">
+          <circle cx="44" cy="44" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+          <circle cx="44" cy="44" r={r} fill="none" stroke={stroke} strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={c} strokeDashoffset={dashOffset}
+            style={{ transition: ready && hasData ? "stroke-dashoffset 1s cubic-bezier(0.33,1,0.68,1)" : "none" }} />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {hasData
+            ? <span className={`text-[24px] font-black tabular-nums leading-none ${textCls}`}>{Math.round(val)}</span>
+            : <span className="text-[24px] font-black leading-none text-zinc-700">—</span>
+          }
+        </div>
+      </div>
+      <p className="text-[9px] font-bold tracking-[0.18em] text-zinc-600 uppercase">Avg Score</p>
+    </>
   );
 }
 
@@ -740,21 +771,65 @@ function Dashboard({
           </div>
         </div>
 
-        {/* ③ Stats row — always visible */}
+        {/* ③ Widget grid — always visible */}
         <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+          className="grid grid-cols-2 gap-3"
           style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 160ms both" }}
         >
-          <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
-            <StatCell target={data?.totalSavings ?? 0}      prefix="$" label="Total Saved"  />
-            <StatCell target={data?.receiptsScanned ?? 0}   round       label="Cases Solved" />
-            {data && data.receiptsScanned > 0
-              ? <StatCell target={data.avgScore} round label="Avg Score" />
-              : <div className="flex flex-col items-center py-4 px-2">
-                  <p className="text-[17px] font-black text-zinc-600 leading-none">—</p>
-                  <p className="text-[9px] text-zinc-500 mt-1.5 font-medium text-center leading-tight">Avg Score</p>
-                </div>
-            }
+          {/* Total Saved */}
+          <div
+            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.18)", backdropFilter: "blur(20px)" }}
+          >
+            <p className="text-[9px] font-bold tracking-[0.18em] text-green-500/60 uppercase">Total Saved</p>
+            <div>
+              <p className="text-[30px] font-black tabular-nums text-green-400 leading-none">
+                <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
+              </p>
+              <p className="text-[10px] text-green-500/40 mt-1 font-medium">lifetime</p>
+            </div>
+          </div>
+
+          {/* Cases Solved */}
+          <div
+            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}
+          >
+            <p className="text-[9px] font-bold tracking-[0.18em] text-violet-500/60 uppercase">Cases Solved</p>
+            <div>
+              <p className="text-[46px] font-black tabular-nums text-violet-400 leading-none">
+                <CountUpValue target={data?.receiptsScanned ?? 0} round />
+              </p>
+              <p className="text-[10px] text-violet-500/40 mt-1 font-medium">receipts</p>
+            </div>
+          </div>
+
+          {/* Avg Score */}
+          <div
+            className="aspect-square rounded-3xl flex flex-col items-center justify-center gap-2 overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(20px)" }}
+          >
+            <AvgScoreWidget
+              score={data?.avgScore ?? 0}
+              hasData={!!data && data.receiptsScanned > 0}
+            />
+          </div>
+
+          {/* Streak */}
+          <div
+            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(249,115,22,0.07)", border: "1px solid rgba(249,115,22,0.18)", backdropFilter: "blur(20px)" }}
+          >
+            <p className="text-[9px] font-bold tracking-[0.18em] text-orange-500/60 uppercase">Streak</p>
+            <div>
+              <div className="flex items-end gap-1.5">
+                <span className="text-[26px] leading-none">🔥</span>
+                <span className="text-[40px] font-black tabular-nums text-orange-400 leading-none">
+                  {data?.streak ?? 0}
+                </span>
+              </div>
+              <p className="text-[10px] text-orange-500/40 mt-1 font-medium">day streak</p>
+            </div>
           </div>
         </div>
 
