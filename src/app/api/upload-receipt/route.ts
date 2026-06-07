@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import sharp from "sharp";
 
 const client = new Anthropic();
 
@@ -21,13 +22,26 @@ export async function POST(request: Request) {
     return Response.json({ error: "No image provided" }, { status: 400 });
   }
 
-  const mediaTypeMatch = imageBase64.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,/);
-  if (!mediaTypeMatch) {
+  if (!imageBase64.match(/^data:image\/(?:jpeg|png|gif|webp);base64,/)) {
     console.error("[upload-receipt] unsupported or missing media type prefix");
     return Response.json({ error: "Unsupported image format. Use JPEG, PNG, GIF, or WebP." }, { status: 400 });
   }
-  const mediaType = mediaTypeMatch[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-  const base64Data = imageBase64.replace(/^data:[^,]+,/, "");
+  const rawBase64 = imageBase64.replace(/^data:[^,]+,/, "");
+
+  let base64Data: string;
+  try {
+    const inputBuffer = Buffer.from(rawBase64, "base64");
+    const resized = await sharp(inputBuffer)
+      .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    base64Data = resized.toString("base64");
+    console.log("[upload-receipt] resized image, new base64 length:", base64Data.length);
+  } catch (err) {
+    console.error("[upload-receipt] sharp resize error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: `Image processing failed: ${msg}` }, { status: 500 });
+  }
 
   let message: Awaited<ReturnType<typeof client.messages.create>>;
   try {
@@ -40,7 +54,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: "image",
-              source: { type: "base64", media_type: mediaType, data: base64Data },
+              source: { type: "base64", media_type: "image/jpeg", data: base64Data },
             },
             {
               type: "text",
