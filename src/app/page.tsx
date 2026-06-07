@@ -4,10 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const RING_R  = 72;
-const RING_C  = 2 * Math.PI * RING_R;
-const SMALL_R = 34;
-const SMALL_C = 2 * Math.PI * SMALL_R;
+const RING_R = 72;
+const RING_C = 2 * Math.PI * RING_R;
 
 const SCAN_STEPS = [
   "Reading receipt...",
@@ -20,113 +18,56 @@ const NAVY: React.CSSProperties = {
   background: "linear-gradient(160deg, #0a0e1a 0%, #131832 100%)",
 };
 
-const TIPS = [
-  "🔍 The detective recommends buying toiletries in bulk. Case studies show 40% savings.",
-  "🕵️ Pro tip: Store brands are chemically identical to name brands 90% of the time.",
-  "📋 Scanning consistently? Detectives who scan weekly save 3x more.",
-  "💡 Amazon Subscribe & Save cuts repeat purchases by 5–15% automatically.",
-  "🏪 Warehouse clubs like Costco save the average household $500/year.",
-  "🧾 The most overpaid category? Grooming — always check online alternatives.",
-];
-
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface ScannedFile {
-  name: string;
-  base64: string;
-}
-
-interface ReceiptItem {
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-interface ExtractedReceipt {
-  storeName: string;
-  date: string;
-  items: ReceiptItem[];
-  total: number;
-}
+interface ScannedFile   { name: string; base64: string; }
+interface ReceiptItem   { name: string; price: number; quantity: number; }
+interface ExtractedReceipt { storeName: string; date: string; items: ReceiptItem[]; total: number; }
 
 interface AnalysisItem {
-  name: string;
-  paid: number;
-  suggestion: string;
-  cheaperStore?: string;
-  cheaperPrice?: number;
-  searchUrl?: string;
+  name: string; paid: number; suggestion: string;
+  cheaperStore?: string; cheaperPrice?: number; searchUrl?: string;
 }
-
 interface Category {
-  emoji: string;
-  name: string;
-  rating: "green" | "yellow" | "red";
-  items: AnalysisItem[];
-  savingsRange?: { min: number; max: number };
+  emoji: string; name: string; rating: "green" | "yellow" | "red";
+  items: AnalysisItem[]; savingsRange?: { min: number; max: number };
 }
-
-interface AnalysisResult {
-  score: number;
-  categories: Category[];
-  totalSavings: number;
-  yearlySavings: number;
-}
+interface AnalysisResult { score: number; categories: Category[]; totalSavings: number; yearlySavings: number; }
 
 interface DbAnalysis {
-  id: string;
-  score: number;
-  leaks: Category[];
-  total_found: number;
-  yearly_potential: number;
+  id: string; score: number; leaks: Category[];
+  total_found: number; yearly_potential: number;
 }
-
 interface HistoryScan {
-  id: string;
-  created_at: string;
-  store_name: string | null;
-  receipt_date: string | null;
-  total: number | null;
-  analyses: DbAnalysis[];
+  id: string; created_at: string; store_name: string | null;
+  receipt_date: string | null; total: number | null; analyses: DbAnalysis[];
 }
-
+interface StoreRanking { name: string; avgScore: number; count: number; }
 interface DashboardData {
   avgScore: number;
   totalSavings: number;
-  weekSavings: number;
   receiptsScanned: number;
   recentCases: HistoryScan[];
-  weeklyBars: number[];
-  bestFind: { itemName: string; savings: number; store: string } | null;
+  storeRankings: StoreRanking[];
+  streak: number;
+  insight: string;
 }
 
-type NavTab = "home" | "history" | "profile" | "settings";
+type NavTab = "home" | "history" | "settings";
 
+// ── Fallback ──────────────────────────────────────────────────────────────────
 const FALLBACK: AnalysisResult = {
   score: 72,
   categories: [
     {
-      emoji: "🧴", name: "Grooming", rating: "red",
-      savingsRange: { min: 7, max: 7 },
-      items: [{
-        name: "Duke Cannon Soap", paid: 14.99,
-        suggestion: "Amazon has a 2-pack for $15.99 — that's $8 each vs $14.99. Save 47%.",
-        cheaperStore: "Amazon", cheaperPrice: 7.99,
-        searchUrl: "https://www.amazon.com/s?k=Duke+Cannon+Soap",
-      }],
+      emoji: "🧴", name: "Grooming", rating: "red", savingsRange: { min: 7, max: 7 },
+      items: [{ name: "Duke Cannon Soap", paid: 14.99, suggestion: "Amazon has a 2-pack for $15.99 — that's $8 each vs $14.99. Save 47%.", cheaperStore: "Amazon", cheaperPrice: 7.99, searchUrl: "https://www.amazon.com/s?k=Duke+Cannon+Soap" }],
     },
     {
-      emoji: "🥤", name: "Drinks", rating: "yellow",
-      savingsRange: { min: 1, max: 3 },
-      items: [{
-        name: "LaCroix 12-pack", paid: 6.99,
-        suggestion: "Walmart has this for $5.98 — saves you $1.01.",
-        cheaperStore: "Walmart", cheaperPrice: 5.98,
-        searchUrl: "https://www.walmart.com/search?q=LaCroix+Sparkling+Water+12+pack",
-      }],
+      emoji: "🥤", name: "Drinks", rating: "yellow", savingsRange: { min: 1, max: 3 },
+      items: [{ name: "LaCroix 12-pack", paid: 6.99, suggestion: "Walmart has this for $5.98 — saves you $1.01.", cheaperStore: "Walmart", cheaperPrice: 5.98, searchUrl: "https://www.walmart.com/search?q=LaCroix+Sparkling+Water+12+pack" }],
     },
     {
-      emoji: "🥦", name: "Produce", rating: "green",
-      savingsRange: { min: 0, max: 0 },
+      emoji: "🥦", name: "Produce", rating: "green", savingsRange: { min: 0, max: 0 },
       items: [{ name: "Organic Broccoli", paid: 2.49, suggestion: "Best price around. Case closed." }],
     },
   ],
@@ -134,7 +75,7 @@ const FALLBACK: AnalysisResult = {
   yearlySavings: 96,
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Pure helpers ──────────────────────────────────────────────────────────────
 function detectiveRank(score: number) {
   if (score >= 81) return "Chief Detective";
   if (score >= 61) return "Inspector";
@@ -143,16 +84,70 @@ function detectiveRank(score: number) {
 }
 
 function analysisFromDb(a: DbAnalysis): AnalysisResult {
-  return {
-    score: a.score,
-    categories: (a.leaks ?? []) as Category[],
-    totalSavings: a.total_found,
-    yearlySavings: a.yearly_potential,
-  };
+  return { score: a.score, categories: (a.leaks ?? []) as Category[], totalSavings: a.total_found, yearlySavings: a.yearly_potential };
 }
 
-function fmtSavings(n: number) {
-  return n % 1 === 0 ? `$${n}` : `$${n.toFixed(2)}`;
+function fmtSavings(n: number) { return n % 1 === 0 ? `$${n}` : `$${n.toFixed(2)}`; }
+
+function scorePillClass(score: number) {
+  return score >= 75
+    ? "text-green-400 bg-green-500/15 border-green-500/25"
+    : score >= 55
+    ? "text-amber-400 bg-amber-500/15 border-amber-500/25"
+    : "text-red-400 bg-red-500/15 border-red-500/25";
+}
+
+function computeStreak(scans: HistoryScan[]): number {
+  if (!scans.length) return 0;
+  const MS_DAY = 86_400_000;
+  const daySet = new Set(
+    scans.map(s => {
+      const d = new Date(s.created_at);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    })
+  );
+  const now = new Date();
+  let ts = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (!daySet.has(ts)) ts -= MS_DAY;
+  let streak = 0;
+  while (daySet.has(ts)) { streak++; ts -= MS_DAY; }
+  return streak;
+}
+
+function computeInsight(scans: HistoryScan[], storeRankings: StoreRanking[]): string {
+  if (scans.length < 3) return "Scan 3+ receipts to unlock personalized insights.";
+
+  if (storeRankings.length >= 2) {
+    const best  = storeRankings[0];
+    const worst = storeRankings[storeRankings.length - 1];
+    if (best.avgScore - worst.avgScore >= 15) {
+      return `Your prices are better at ${best.name} (${best.avgScore}/100) than at ${worst.name} (${worst.avgScore}/100).`;
+    }
+  }
+
+  const catOverpaid: Record<string, number> = {};
+  for (const scan of scans) {
+    for (const analysis of scan.analyses ?? []) {
+      for (const cat of (analysis.leaks ?? []) as Category[]) {
+        if (!catOverpaid[cat.name]) catOverpaid[cat.name] = 0;
+        if (cat.rating === "red")    catOverpaid[cat.name] += 2;
+        if (cat.rating === "yellow") catOverpaid[cat.name] += 1;
+      }
+    }
+  }
+  const topCat = Object.entries(catOverpaid).sort((a, b) => b[1] - a[1])[0];
+  if (topCat && topCat[1] >= 2) {
+    return `${topCat[0]} is your biggest savings opportunity — you're consistently overpaying.`;
+  }
+
+  const allAnalyses = scans.flatMap(s => s.analyses ?? []);
+  const avg = allAnalyses.length
+    ? Math.round(allAnalyses.reduce((s, a) => s + a.score, 0) / allAnalyses.length)
+    : 0;
+  if (avg >= 80) return "You're shopping smart — most items are near best price. Keep it up, Detective.";
+
+  const total = allAnalyses.reduce((s, a) => s + (a.total_found ?? 0), 0);
+  return `$${total.toFixed(2)} in savings found so far. Scanning regularly saves 3× more.`;
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
@@ -176,7 +171,7 @@ function useCountUp(target: number, duration = 1300, delay = 400) {
 }
 
 function useDashboardData(refreshKey: number) {
-  const [data, setData]     = useState<DashboardData | null>(null);
+  const [data,    setData]    = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -188,56 +183,36 @@ function useDashboardData(refreshKey: number) {
       .limit(100)
       .then(({ data: rows, error }) => {
         if (error || !rows) { setLoading(false); return; }
-        const scans      = rows as HistoryScan[];
+        const scans       = rows as HistoryScan[];
         const allAnalyses = scans.flatMap(s => s.analyses ?? []);
 
-        const totalSavings = Number(
-          allAnalyses.reduce((s, a) => s + (a.total_found ?? 0), 0).toFixed(2),
-        );
-        const avgScore = allAnalyses.length > 0
+        const totalSavings   = Number(allAnalyses.reduce((s, a) => s + (a.total_found ?? 0), 0).toFixed(2));
+        const avgScore       = allAnalyses.length
           ? Math.round(allAnalyses.reduce((s, a) => s + (a.score ?? 0), 0) / allAnalyses.length)
           : 0;
 
-        const weekAgo    = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const weekSavings = Number(
-          scans
-            .filter(s => new Date(s.created_at).getTime() > weekAgo)
-            .flatMap(s => s.analyses ?? [])
-            .reduce((sum, a) => sum + (a.total_found ?? 0), 0)
-            .toFixed(2),
-        );
-
-        const weeklyBars = [0, 0, 0, 0];
-        const now = Date.now();
+        const storeMap: Record<string, number[]> = {};
         for (const scan of scans) {
-          const daysAgo = (now - new Date(scan.created_at).getTime()) / (1000 * 60 * 60 * 24);
-          const wIdx    = Math.floor(daysAgo / 7);
-          if (wIdx < 4) weeklyBars[3 - wIdx] += scan.analyses?.[0]?.total_found ?? 0;
-        }
-
-        let bestFind: DashboardData["bestFind"] = null;
-        let maxSav = 0;
-        for (const scan of scans) {
-          for (const analysis of scan.analyses ?? []) {
-            for (const cat of (analysis.leaks ?? []) as Category[]) {
-              for (const item of cat.items ?? []) {
-                const sav = item.cheaperPrice != null ? item.paid - item.cheaperPrice : 0;
-                if (sav > maxSav && item.cheaperStore) {
-                  maxSav   = sav;
-                  bestFind = { itemName: item.name, savings: sav, store: item.cheaperStore };
-                }
-              }
-            }
+          const name  = scan.store_name?.trim();
+          const score = scan.analyses?.[0]?.score;
+          if (name && score != null) {
+            if (!storeMap[name]) storeMap[name] = [];
+            storeMap[name].push(score);
           }
         }
+        const storeRankings: StoreRanking[] = Object.entries(storeMap)
+          .map(([name, scores]) => ({
+            name,
+            avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+            count: scores.length,
+          }))
+          .sort((a, b) => b.avgScore - a.avgScore)
+          .slice(0, 3);
 
-        setData({
-          avgScore, totalSavings, weekSavings,
-          receiptsScanned: scans.length,
-          recentCases: scans.slice(0, 3),
-          weeklyBars,
-          bestFind,
-        });
+        const streak  = computeStreak(scans);
+        const insight = computeInsight(scans, storeRankings);
+
+        setData({ avgScore, totalSavings, receiptsScanned: scans.length, recentCases: scans.slice(0, 3), storeRankings, streak, insight });
         setLoading(false);
       });
   }, [refreshKey]);
@@ -245,7 +220,7 @@ function useDashboardData(refreshKey: number) {
   return { data, loading };
 }
 
-// ── Database ──────────────────────────────────────────────────────────────────
+// ── DB ────────────────────────────────────────────────────────────────────────
 async function saveScanToDb(
   receipt: ExtractedReceipt | null,
   analysis: AnalysisResult,
@@ -253,30 +228,14 @@ async function saveScanToDb(
 ) {
   const { data, error } = await supabase
     .from("receipts")
-    .insert({
-      store_name:   receipt?.storeName   ?? null,
-      receipt_date: receipt?.date        ?? null,
-      items:        receipt?.items       ?? null,
-      total:        receipt?.total       ?? null,
-      image_base64: imageBase64          ?? null,
-    })
-    .select("id")
-    .single();
-
+    .insert({ store_name: receipt?.storeName ?? null, receipt_date: receipt?.date ?? null, items: receipt?.items ?? null, total: receipt?.total ?? null, image_base64: imageBase64 ?? null })
+    .select("id").single();
   if (error) throw error;
-
-  const { error: aErr } = await supabase.from("analyses").insert({
-    receipt_id:       data.id,
-    leaks:            analysis.categories,
-    total_found:      analysis.totalSavings,
-    yearly_potential: analysis.yearlySavings,
-    score:            analysis.score,
-  });
-
+  const { error: aErr } = await supabase.from("analyses").insert({ receipt_id: data.id, leaks: analysis.categories, total_found: analysis.totalSavings, yearly_potential: analysis.yearlySavings, score: analysis.score });
   if (aErr) throw aErr;
 }
 
-// ── Spy Illustration ──────────────────────────────────────────────────────────
+// ── Spy illustration ──────────────────────────────────────────────────────────
 function SpyCharacter({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
@@ -320,45 +279,28 @@ function SpyCharacter({ className }: { className?: string }) {
   );
 }
 
-// ── Bottom Nav ────────────────────────────────────────────────────────────────
+// ── Bottom Nav (3 tabs) ───────────────────────────────────────────────────────
 function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: NavTab) => void }) {
   const tabs: { key: NavTab; label: string; icon: React.ReactNode }[] = [
     {
-      key: "home",
-      label: "Home",
+      key: "home", label: "Home",
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-          <polyline points="9,22 9,12 15,12 15,22" />
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9,22 9,12 15,12 15,22" />
         </svg>
       ),
     },
     {
-      key: "history",
-      label: "History",
+      key: "history", label: "History",
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-          <polyline points="14,2 14,8 20,8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <line x1="10" y1="9" x2="8" y2="9" />
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14,2 14,8 20,8" />
+          <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
         </svg>
       ),
     },
     {
-      key: "profile",
-      label: "Profile",
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      ),
-    },
-    {
-      key: "settings",
-      label: "Settings",
+      key: "settings", label: "Settings",
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3" />
@@ -370,7 +312,7 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
 
   return (
     <div
-      className="border-t border-white/[0.06] grid grid-cols-4 flex-shrink-0"
+      className="border-t border-white/[0.06] grid grid-cols-3 flex-shrink-0"
       style={{ background: "rgba(10,14,26,0.88)", backdropFilter: "blur(20px)" }}
     >
       {tabs.map((tab) => {
@@ -380,9 +322,7 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
             className={`py-3 flex flex-col items-center gap-1 text-[10px] font-semibold tracking-wide transition-all
-              ${isActive
-                ? "text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.6)]"
-                : "text-zinc-600 hover:text-zinc-400"}`}
+              ${isActive ? "text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.6)]" : "text-zinc-600 hover:text-zinc-400"}`}
           >
             {tab.icon}
             {tab.label.toUpperCase()}
@@ -394,32 +334,19 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
 }
 
 // ── Scan overlay ──────────────────────────────────────────────────────────────
-function Scan({
-  onProgressDone,
-  filename,
-  error,
-  onRetry,
-}: {
-  onProgressDone: () => void;
-  filename?: string;
-  error?: string | null;
-  onRetry?: () => void;
-}) {
+function Scan({ onProgressDone, filename, error, onRetry }: { onProgressDone: () => void; filename?: string; error?: string | null; onRetry?: () => void }) {
   const [progress, setProgress] = useState(0);
   const [step, setStep]         = useState(0);
   const cbRef = useRef(onProgressDone);
   cbRef.current = onProgressDone;
 
   useEffect(() => {
-    const DURATION = 2500;
-    let raf: number;
-    let start: number | null = null;
+    let raf: number; let start: number | null = null;
     const tick = (now: number) => {
       if (start === null) start = now;
-      const t = Math.min(Math.max(0, now - start) / DURATION, 1);
+      const t = Math.min(Math.max(0, now - start) / 2500, 1);
       setProgress(Math.round(t * 100));
-      if (t < 1) { raf = requestAnimationFrame(tick); }
-      else { setTimeout(() => cbRef.current(), 350); }
+      if (t < 1) { raf = requestAnimationFrame(tick); } else { setTimeout(() => cbRef.current(), 350); }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -437,9 +364,7 @@ function Scan({
       </div>
       <div className="relative px-6 pt-14 pb-4 flex items-end justify-between border-b border-white/[0.06]">
         <h1 className="text-lg font-black tracking-tight">RECEIPT DETECTIVE</h1>
-        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">
-          {error ? "Error" : "On The Case"}
-        </span>
+        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">{error ? "Error" : "On The Case"}</span>
       </div>
       <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-8">
         <SpyCharacter className="w-28 h-auto opacity-90" />
@@ -451,10 +376,7 @@ function Scan({
                 <p className="text-sm text-zinc-300 leading-relaxed">{error}</p>
               </div>
               {onRetry && (
-                <button
-                  onClick={onRetry}
-                  className="w-full bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] text-zinc-300 py-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-colors"
-                >
+                <button onClick={onRetry} className="w-full bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] text-zinc-300 py-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-colors">
                   TRY AGAIN
                 </button>
               )}
@@ -464,18 +386,13 @@ function Scan({
               <div>
                 <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">Status</p>
                 <div className="h-6 overflow-hidden">
-                  <p key={step} className="text-base font-semibold text-white animate-[fade-up_0.22s_ease-out_forwards]">
-                    {SCAN_STEPS[step]}
-                  </p>
+                  <p key={step} className="text-base font-semibold text-white animate-[fade-up_0.22s_ease-out_forwards]">{SCAN_STEPS[step]}</p>
                 </div>
                 {filename && <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate">📎 {filename}</p>}
               </div>
               <div className="space-y-2">
                 <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]"
-                    style={{ width: `${progress}%`, background: "linear-gradient(90deg, #7c3aed, #8b5cf6)" }}
-                  />
+                  <div className="h-full rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]" style={{ width: `${progress}%`, background: "linear-gradient(90deg, #7c3aed, #8b5cf6)" }} />
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">Progress</span>
@@ -493,13 +410,10 @@ function Scan({
 // ── Category card ─────────────────────────────────────────────────────────────
 function CategoryCard({ category, index }: { category: Category; index: number }) {
   const [expanded, setExpanded] = useState(false);
-
   const sr = category.savingsRange;
   const hasSavings   = sr && (sr.min > 0 || sr.max > 0);
   const savingsLabel = hasSavings
-    ? sr!.min === sr!.max
-      ? `${fmtSavings(sr!.min)}/mo`
-      : `${fmtSavings(sr!.min)}–${fmtSavings(sr!.max)}/mo`
+    ? sr!.min === sr!.max ? `${fmtSavings(sr!.min)}/mo` : `${fmtSavings(sr!.min)}–${fmtSavings(sr!.max)}/mo`
     : null;
 
   return (
@@ -507,14 +421,8 @@ function CategoryCard({ category, index }: { category: Category; index: number }
       className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
       style={{ animation: `cardIn 0.55s cubic-bezier(0.34,1.56,0.64,1) ${300 + index * 110}ms both` }}
     >
-      <button
-        className="w-full flex items-center gap-4 px-4 py-4 text-left active:bg-white/[0.03] transition-colors"
-        onClick={() => setExpanded(e => !e)}
-      >
-        <div
-          className="w-14 h-14 rounded-2xl bg-white/[0.07] flex items-center justify-center flex-shrink-0"
-          style={{ fontSize: "32px", lineHeight: 1 }}
-        >
+      <button className="w-full flex items-center gap-4 px-4 py-4 text-left active:bg-white/[0.03] transition-colors" onClick={() => setExpanded(e => !e)}>
+        <div className="w-14 h-14 rounded-2xl bg-white/[0.07] flex items-center justify-center flex-shrink-0" style={{ fontSize: "32px", lineHeight: 1 }}>
           {category.emoji}
         </div>
         <div className="flex-1 min-w-0">
@@ -524,17 +432,13 @@ function CategoryCard({ category, index }: { category: Category; index: number }
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           {savingsLabel
             ? <span className="text-sm font-black text-green-400 tabular-nums leading-none">{savingsLabel}</span>
-            : <span className="text-xs font-bold text-green-400 leading-none">Best price</span>
-          }
-          <svg
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            className={`w-4 h-4 text-zinc-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
-          >
+            : <span className="text-xs font-bold text-green-400 leading-none">Best price</span>}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+            className={`w-4 h-4 text-zinc-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}>
             <path d="M6 9l6 6 6-6" />
           </svg>
         </div>
       </button>
-
       <div style={{ maxHeight: expanded ? "900px" : "0", transition: "max-height 0.4s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden" }}>
         <div className="border-t border-white/[0.06] divide-y divide-white/[0.04]">
           {category.items.map((item, j) => {
@@ -560,12 +464,8 @@ function CategoryCard({ category, index }: { category: Category; index: number }
                       </div>
                     )}
                     {item.cheaperStore && safeUrl && (
-                      <a
-                        href={safeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-400 hover:text-violet-300 active:text-violet-500 transition-colors"
-                      >
+                      <a href={safeUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-400 hover:text-violet-300 active:text-violet-500 transition-colors">
                         <span>View on {item.cheaperStore}</span>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="w-3.5 h-3.5 flex-shrink-0">
                           <path d="M5 12h14M12 5l7 7-7 7" />
@@ -583,122 +483,43 @@ function CategoryCard({ category, index }: { category: Category; index: number }
   );
 }
 
-// ── Small score ring (dashboard widget) ───────────────────────────────────────
-function ScoreRingSmall({ score }: { score: number }) {
-  const [ready, setReady]  = useState(false);
-  const val                = useCountUp(score, 1000, 300);
-  useEffect(() => { const id = requestAnimationFrame(() => setReady(true)); return () => cancelAnimationFrame(id); }, []);
-  const dashOffset = ready ? SMALL_C * (1 - val / 100) : SMALL_C;
-
+// ── Count-up stat cell ────────────────────────────────────────────────────────
+function StatCell({ target, prefix = "", round = false, label }: { target: number; prefix?: string; round?: boolean; label: string }) {
+  const v = useCountUp(target, 900, 300);
   return (
-    <div className="relative w-[88px] h-[88px] flex-shrink-0">
-      <svg width="88" height="88" viewBox="0 0 88 88" className="-rotate-90">
-        <defs>
-          <linearGradient id="smallRingGrad" x1="44" y1="10" x2="44" y2="78" gradientUnits="userSpaceOnUse">
-            <stop offset="0%"   stopColor="#ef4444" />
-            <stop offset="45%"  stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#22c55e" />
-          </linearGradient>
-        </defs>
-        <circle cx="44" cy="44" r={SMALL_R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
-        <circle
-          cx="44" cy="44" r={SMALL_R}
-          fill="none" stroke="url(#smallRingGrad)" strokeWidth="7" strokeLinecap="round"
-          strokeDasharray={SMALL_C} strokeDashoffset={dashOffset}
-          style={{ transition: ready ? "stroke-dashoffset 1.2s cubic-bezier(0.33,1,0.68,1)" : "none" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-black tabular-nums leading-none">{Math.round(val)}</span>
-        <span className="text-[8px] text-zinc-600 font-bold">/ 100</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Mini bar chart ────────────────────────────────────────────────────────────
-function MiniBarChart({ bars }: { bars: number[] }) {
-  const max    = Math.max(...bars, 0.01);
-  const labels = ["3w ago", "2w ago", "Last wk", "This wk"];
-  return (
-    <div className="flex items-end gap-2 h-14">
-      {bars.map((val, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-          <div className="w-full relative rounded-sm bg-white/[0.06]" style={{ height: 40 }}>
-            <div
-              className="absolute bottom-0 left-0 right-0 rounded-sm transition-all duration-700"
-              style={{
-                height: `${(val / max) * 100}%`,
-                background: i === 3
-                  ? "linear-gradient(180deg, #a78bfa, #7c3aed)"
-                  : "rgba(124,58,237,0.35)",
-              }}
-            />
-          </div>
-          <span className="text-[8px] text-zinc-700 text-center leading-tight">{labels[i]}</span>
-        </div>
-      ))}
+    <div className="flex flex-col items-center py-4 px-2">
+      <p className="text-[17px] font-black tabular-nums text-white leading-none">
+        {prefix}{round ? Math.round(v) : v.toFixed(2)}
+      </p>
+      <p className="text-[9px] text-zinc-500 mt-1.5 font-medium text-center leading-tight">{label}</p>
     </div>
   );
 }
 
 // ── Result modal (slide-up sheet) ─────────────────────────────────────────────
-function ResultModal({
-  data,
-  receipt,
-  onClose,
-}: {
-  data: AnalysisResult;
-  receipt: ExtractedReceipt | null;
-  onClose: () => void;
-}) {
+function ResultModal({ data, receipt, onClose }: { data: AnalysisResult; receipt: ExtractedReceipt | null; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   const scoreVal   = useCountUp(data.score,        1200, 300);
   const savingsVal = useCountUp(data.totalSavings,  1300, 400);
   const yearlyVal  = useCountUp(data.yearlySavings, 1500, 400);
 
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  useEffect(() => { const id = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(id); }, []);
 
-  const dashOffset = mounted ? RING_C * (1 - scoreVal / 100) : RING_C;
-
-  const scoreBadge =
-    scoreVal >= 75 ? "text-green-400 bg-green-500/10 border-green-500/25" :
-    scoreVal >= 55 ? "text-amber-400 bg-amber-500/10 border-amber-500/25" :
-                     "text-red-400   bg-red-500/10   border-red-500/25";
-
-  const scoreLabel =
-    scoreVal >= 75 ? "Good Shape"        :
-    scoreVal >= 55 ? "Needs Improvement" : "High Risk";
-
-  const glowColor =
-    scoreVal >= 70 ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent)"  :
-    scoreVal >= 45 ? "radial-gradient(circle, rgba(245,158,11,0.18), transparent)" :
-                     "radial-gradient(circle, rgba(239,68,68,0.18), transparent)";
+  const dashOffset   = mounted ? RING_C * (1 - scoreVal / 100) : RING_C;
+  const scoreBadge   = scoreVal >= 75 ? "text-green-400 bg-green-500/10 border-green-500/25" : scoreVal >= 55 ? "text-amber-400 bg-amber-500/10 border-amber-500/25" : "text-red-400 bg-red-500/10 border-red-500/25";
+  const scoreLabel   = scoreVal >= 75 ? "Good Shape" : scoreVal >= 55 ? "Needs Improvement" : "High Risk";
+  const glowColor    = scoreVal >= 70 ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent)" : scoreVal >= 45 ? "radial-gradient(circle, rgba(245,158,11,0.18), transparent)" : "radial-gradient(circle, rgba(239,68,68,0.18), transparent)";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm transition-opacity duration-300"
-        style={{ opacity: mounted ? 1 : 0 }}
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm transition-opacity duration-300" style={{ opacity: mounted ? 1 : 0 }} onClick={onClose} />
       <div
         className="relative z-10 flex flex-col rounded-t-[28px] overflow-hidden border-t border-white/[0.08]"
-        style={{
-          ...NAVY,
-          maxHeight: "92vh",
-          transform: mounted ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.45s cubic-bezier(0.32,0.72,0,1)",
-        }}
+        style={{ ...NAVY, maxHeight: "92vh", transform: mounted ? "translateY(0)" : "translateY(100%)", transition: "transform 0.45s cubic-bezier(0.32,0.72,0,1)" }}
       >
         <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-violet-600/[0.07] rounded-full blur-[80px]" />
-          <div className="absolute bottom-0 right-0 w-56 h-56 bg-indigo-600/[0.04] rounded-full blur-[70px]" />
         </div>
-
         {/* Handle + header */}
         <div className="relative z-10 flex-shrink-0 pt-3 px-5 pb-4 border-b border-white/[0.06]">
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4" />
@@ -710,21 +531,14 @@ function ResultModal({
               </svg>
               <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase">Case Report</p>
             </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4"><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
           </div>
         </div>
-
         {/* Scrollable content */}
         <div className="relative z-10 flex-1 overflow-y-auto">
           <div className="px-5 py-5 space-y-4 max-w-sm mx-auto pb-8">
-
             {/* Score ring */}
             <div className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col items-center">
               <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-5">Price Efficiency Score</p>
@@ -733,18 +547,13 @@ function ResultModal({
                 <svg width="212" height="212" viewBox="0 0 212 212" className="-rotate-90">
                   <defs>
                     <linearGradient id="modalRingGrad" x1="106" y1="24" x2="106" y2="188" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%"   stopColor="#ef4444" />
-                      <stop offset="45%"  stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#22c55e" />
+                      <stop offset="0%"   stopColor="#ef4444" /><stop offset="45%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#22c55e" />
                     </linearGradient>
                   </defs>
                   <circle cx="106" cy="106" r={RING_R} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="11" />
-                  <circle
-                    cx="106" cy="106" r={RING_R}
-                    fill="none" stroke="url(#modalRingGrad)" strokeWidth="11" strokeLinecap="round"
+                  <circle cx="106" cy="106" r={RING_R} fill="none" stroke="url(#modalRingGrad)" strokeWidth="11" strokeLinecap="round"
                     strokeDasharray={RING_C} strokeDashoffset={dashOffset}
-                    style={{ transition: mounted ? "stroke-dashoffset 1.3s cubic-bezier(0.33,1,0.68,1)" : "none" }}
-                  />
+                    style={{ transition: mounted ? "stroke-dashoffset 1.3s cubic-bezier(0.33,1,0.68,1)" : "none" }} />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                   <span className="text-[54px] font-black tabular-nums leading-none">{Math.round(scoreVal)}</span>
@@ -767,8 +576,7 @@ function ResultModal({
                 </div>
               </div>
             </div>
-
-            {/* Receipt summary */}
+            {/* Receipt */}
             {receipt && (
               <div className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
                 <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-2">Receipt</p>
@@ -777,55 +585,38 @@ function ResultModal({
                     <p className="text-base font-black text-white leading-none truncate">{receipt.storeName || "Unknown Store"}</p>
                     <p className="text-xs text-zinc-500 mt-1">{receipt.date} · {receipt.items.length} item{receipt.items.length !== 1 ? "s" : ""}</p>
                   </div>
-                  <p className="text-lg font-black tabular-nums flex-shrink-0">
-                    ${typeof receipt.total === "number" ? receipt.total.toFixed(2) : "—"}
-                  </p>
+                  <p className="text-lg font-black tabular-nums flex-shrink-0">${typeof receipt.total === "number" ? receipt.total.toFixed(2) : "—"}</p>
                 </div>
               </div>
             )}
-
-            {/* Category cards */}
+            {/* Categories */}
             <div>
               <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-3">Price Intelligence</p>
               <div className="space-y-3">
-                {data.categories.map((cat, i) => (
-                  <CategoryCard key={cat.name + i} category={cat} index={i} />
-                ))}
+                {data.categories.map((cat, i) => <CategoryCard key={cat.name + i} category={cat} index={i} />)}
               </div>
             </div>
-
             {/* Summary */}
             <div className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
               <p className="text-[9px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-4">Case Summary</p>
               <div className="space-y-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-zinc-400">Savings this receipt</span>
-                  <span
-                    className="text-3xl font-black tabular-nums"
-                    style={{ background: "linear-gradient(135deg, #4ade80, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
-                  >
+                  <span className="text-3xl font-black tabular-nums" style={{ background: "linear-gradient(135deg, #4ade80, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                     ${savingsVal.toFixed(2)}
                   </span>
                 </div>
                 <div className="h-px bg-white/[0.06]" />
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-zinc-400">Yearly projection</span>
-                  <span
-                    className="text-xl font-black tabular-nums"
-                    style={{ background: "linear-gradient(135deg, #a78bfa, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
-                  >
+                  <span className="text-xl font-black tabular-nums" style={{ background: "linear-gradient(135deg, #a78bfa, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                     ${Math.round(yearlyVal).toLocaleString()}/yr
                   </span>
                 </div>
               </div>
             </div>
-
-            {/* Close */}
-            <button
-              onClick={onClose}
-              className="w-full py-[18px] rounded-2xl font-bold text-sm tracking-widest uppercase text-white transition-opacity hover:opacity-90 active:opacity-80"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 24px rgba(124,58,237,0.35)" }}
-            >
+            <button onClick={onClose} className="w-full py-[18px] rounded-2xl font-bold text-sm tracking-widest uppercase text-white hover:opacity-90 active:opacity-80 transition-opacity"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 24px rgba(124,58,237,0.35)" }}>
               CLOSE CASE
             </button>
           </div>
@@ -837,22 +628,14 @@ function ResultModal({
 
 // ── Dashboard (Home tab) ──────────────────────────────────────────────────────
 function Dashboard({
-  data,
-  loading,
-  onScan,
-  onViewHistory,
-  onViewResult,
+  data, loading, onScan, onViewHistory, onViewResult,
 }: {
-  data: DashboardData | null;
-  loading: boolean;
-  onScan: (f: ScannedFile) => void;
-  onViewHistory: () => void;
-  onViewResult: (r: AnalysisResult) => void;
+  data: DashboardData | null; loading: boolean;
+  onScan: (f: ScannedFile) => void; onViewHistory: () => void; onViewResult: (r: AnalysisResult) => void;
 }) {
-  const fileRef    = useRef<HTMLInputElement>(null);
-  const cbRef      = useRef(onScan);
-  cbRef.current    = onScan;
-  const tip        = useRef(TIPS[Math.floor(Math.random() * TIPS.length)]).current;
+  const fileRef  = useRef<HTMLInputElement>(null);
+  const cbRef    = useRef(onScan);
+  cbRef.current  = onScan;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -864,116 +647,122 @@ function Dashboard({
   };
 
   const isEmpty = !loading && (data?.receiptsScanned ?? 0) === 0;
+  const rank    = data?.avgScore != null ? detectiveRank(data.avgScore) : null;
+  const streak  = data?.streak ?? 0;
+  const MEDALS  = ["🥇", "🥈", "🥉"] as const;
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="px-5 pt-2 pb-6 space-y-4 max-w-sm mx-auto">
+      <div className="px-5 pt-3 pb-8 space-y-4 max-w-sm mx-auto">
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
-        {/* Widget 1 — Scan Now */}
+        {/* ① Greeting */}
         <div
-          className="relative p-[1.5px] rounded-3xl overflow-hidden"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0ms both" }}
+          className="flex items-center gap-2 min-h-[36px]"
+          style={{ animation: "cardIn 0.4s ease-out 0ms both" }}
         >
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #6d28d9, #a78bfa, #6d28d9)" }} />
-          <div className="relative rounded-[22px] p-5 flex items-center gap-5" style={{ background: "#0d1122" }}>
+          <span className="text-[17px] font-black text-white leading-none">Hey Detective 🕵️</span>
+          {rank && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
+              {rank}
+            </span>
+          )}
+          <div className="flex-1" />
+          {streak > 0 && (
+            <span className="text-sm font-black text-orange-400 flex-shrink-0">{streak}🔥</span>
+          )}
+        </div>
+
+        {/* ② SCAN NOW hero */}
+        <div className="relative" style={{ animation: "cardIn 0.55s cubic-bezier(0.34,1.56,0.64,1) 80ms both" }}>
+          {/* Pulsing glow ring */}
+          <div
+            className="absolute -inset-[5px] rounded-[30px] animate-pulse pointer-events-none"
+            style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.5), rgba(167,139,250,0.4))", filter: "blur(12px)" }}
+          />
+          {/* Gradient border */}
+          <div className="relative p-[1.5px] rounded-[26px] overflow-hidden">
+            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #6d28d9, #a78bfa, #6d28d9)" }} />
             <button
               onClick={() => fileRef.current?.click()}
-              className="relative flex-shrink-0 active:scale-95 transition-transform"
-              aria-label="Scan receipt"
+              className="relative w-full rounded-[25px] flex flex-col items-center justify-center gap-5 active:scale-[0.985] transition-transform select-none"
+              style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)", minHeight: "38vh", padding: "2.5rem 1.5rem" }}
             >
+              {/* Camera icon */}
               <div
-                className="w-[76px] h-[76px] rounded-full flex items-center justify-center"
-                style={{ background: "rgba(109,40,217,0.18)", border: "2px solid rgba(109,40,217,0.45)" }}
+                className="w-24 h-24 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(109,40,217,0.18)", border: "1.5px solid rgba(167,139,250,0.35)" }}
               >
-                <div
-                  className="w-[54px] h-[54px] rounded-full flex items-center justify-center animate-pulse"
-                  style={{ background: "rgba(109,40,217,0.25)" }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="w-7 h-7 text-violet-400">
-                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="w-12 h-12 text-violet-400">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-[28px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
+                <p className="text-zinc-500 text-sm leading-snug">
+                  {isEmpty ? "Start your first investigation" : "Tap to investigate your prices"}
+                </p>
               </div>
             </button>
-            <div>
-              <p className="text-[22px] font-black text-white leading-tight">Scan Receipt</p>
-              <p className="text-zinc-500 text-sm mt-1 leading-snug">Tap to open camera<br />and start investigation</p>
-            </div>
           </div>
         </div>
 
-        {/* Empty state */}
-        {isEmpty && (
-          <div className="text-center py-10 space-y-3">
-            <SpyCharacter className="w-24 h-auto mx-auto opacity-40" />
-            <p className="text-zinc-300 font-bold text-base">No cases yet.</p>
-            <p className="text-zinc-600 text-sm">Start your first investigation ↑</p>
+        {/* Empty state (below hero) */}
+        {isEmpty && !loading && (
+          <div className="text-center py-4" style={{ animation: "cardIn 0.5s ease-out 180ms both" }}>
+            <SpyCharacter className="w-16 h-auto mx-auto opacity-25" />
+            <p className="text-zinc-600 text-xs mt-2">No cases on file yet.</p>
           </div>
         )}
 
-        {/* Loading */}
-        {loading && (
-          <div className="flex justify-center py-10">
-            <div className="w-6 h-6 border-2 border-white/10 border-t-violet-500 rounded-full animate-spin" />
-          </div>
-        )}
-
-        {/* Widgets (only when data loaded and non-empty) */}
+        {/* ③–⑥ data widgets */}
         {!loading && data && data.receiptsScanned > 0 && (
           <>
-            {/* Widget 2 — Detective Score */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center gap-4"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 100ms both" }}
-            >
-              <ScoreRingSmall score={data.avgScore} />
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1">Detective Rank</p>
-                <p className="font-black text-white leading-tight truncate" style={{ fontSize: "18px" }}>
-                  {detectiveRank(data.avgScore)}
-                </p>
-                <p className="text-xs text-zinc-500 mt-0.5">avg. {data.avgScore}/100 efficiency</p>
-              </div>
-            </div>
-
-            {/* Widget 3 — Total Saved */}
-            <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-5"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 200ms both" }}
-            >
-              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-3">Total Saved</p>
-              <TotalSavedWidget
-                totalSavings={data.totalSavings}
-                weekSavings={data.weekSavings}
-                weeklyBars={data.weeklyBars}
-              />
-            </div>
-
-            {/* Widget 4 — Best Find */}
-            {data.bestFind && (
-              <div
-                className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center gap-4"
-                style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 300ms both" }}
-              >
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0 text-2xl">
-                  🏆
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-0.5">Best Find</p>
-                  <p className="text-sm font-black text-white leading-tight truncate">{data.bestFind.itemName}</p>
-                  <p className="text-xs text-green-400 font-bold mt-0.5 truncate">
-                    Saved ${data.bestFind.savings.toFixed(2)} at {data.bestFind.store}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Widget 5 — Recent Cases */}
+            {/* ③ Stats row */}
             <div
               className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 400ms both" }}
+              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 160ms both" }}
+            >
+              <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
+                <StatCell target={data.totalSavings} prefix="$"  label="Total Saved"  />
+                <StatCell target={data.receiptsScanned} round     label="Cases Solved" />
+                <StatCell target={data.avgScore}         round     label="Avg Score"    />
+              </div>
+            </div>
+
+            {/* ④ Store Rankings */}
+            <div
+              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 240ms both" }}
+            >
+              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">Store Rankings</p>
+              <div className="divide-y divide-white/[0.05]">
+                {MEDALS.map((medal, i) => {
+                  const store = data.storeRankings[i];
+                  if (!store) return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3 opacity-40">
+                      <span className="text-lg">{medal}</span>
+                      <span className="text-xs text-zinc-600 italic">Scan more to unlock</span>
+                    </div>
+                  );
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      <span className="text-lg flex-shrink-0">{medal}</span>
+                      <span className="flex-1 text-sm font-bold text-white truncate">{store.name}</span>
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${scorePillClass(store.avgScore)}`}>
+                        {store.avgScore}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ⑤ Recent Cases */}
+            <div
+              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 320ms both" }}
             >
               <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">Recent Cases</p>
@@ -983,10 +772,7 @@ function Dashboard({
               </div>
               <div className="divide-y divide-white/[0.05]">
                 {data.recentCases.map((scan) => {
-                  const analysis   = scan.analyses?.[0];
-                  const scoreColor = !analysis ? "text-zinc-500" :
-                    analysis.score >= 75 ? "text-green-400" :
-                    analysis.score >= 55 ? "text-amber-400" : "text-red-400";
+                  const analysis = scan.analyses?.[0];
                   return (
                     <button
                       key={scan.id}
@@ -1000,9 +786,9 @@ function Dashboard({
                         </p>
                       </div>
                       {analysis && (
-                        <div className="text-right flex-shrink-0">
-                          <p className={`text-base font-black tabular-nums leading-none ${scoreColor}`}>{analysis.score}</p>
-                          <p className="text-[10px] text-zinc-600 tabular-nums">${Number(analysis.total_found).toFixed(2)} saved</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${scorePillClass(analysis.score)}`}>{analysis.score}</span>
                         </div>
                       )}
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-700 flex-shrink-0">
@@ -1014,13 +800,18 @@ function Dashboard({
               </div>
             </div>
 
-            {/* Widget 6 — Quick Tip */}
+            {/* ⑥ Smart Insight */}
             <div
-              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4"
-              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 500ms both" }}
+              className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex gap-3 items-start"
+              style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 400ms both" }}
             >
-              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-2">Quick Tip</p>
-              <p className="text-sm text-zinc-300 leading-relaxed">{tip}</p>
+              <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 text-base leading-none">
+                💡
+              </div>
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Smart Insight</p>
+                <p className="text-sm text-zinc-300 leading-relaxed">{data.insight}</p>
+              </div>
             </div>
           </>
         )}
@@ -1029,33 +820,9 @@ function Dashboard({
   );
 }
 
-function TotalSavedWidget({
-  totalSavings,
-  weekSavings,
-  weeklyBars,
-}: {
-  totalSavings: number;
-  weekSavings: number;
-  weeklyBars: number[];
-}) {
-  const val = useCountUp(totalSavings, 1200, 200);
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-[38px] font-black tabular-nums text-white leading-none">${val.toFixed(2)}</p>
-        <p className="text-sm font-bold mt-1.5">
-          <span className="text-zinc-500">This week: </span>
-          <span className="text-green-400">${weekSavings.toFixed(2)}</span>
-        </p>
-      </div>
-      <MiniBarChart bars={weeklyBars} />
-    </div>
-  );
-}
-
 // ── History tab ───────────────────────────────────────────────────────────────
 function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => void }) {
-  const [scans, setScans]     = useState<HistoryScan[]>([]);
+  const [scans,   setScans]   = useState<HistoryScan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1076,7 +843,7 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
     </div>
   );
 
-  if (scans.length === 0) return (
+  if (!scans.length) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
       <SpyCharacter className="w-20 h-auto opacity-30" />
       <p className="text-zinc-400 font-bold">No cases yet.</p>
@@ -1089,10 +856,7 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
       <div className="px-5 pt-3 pb-6 space-y-3 max-w-sm mx-auto">
         <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">All Cases · {scans.length}</p>
         {scans.map((scan) => {
-          const analysis   = scan.analyses?.[0];
-          const scoreColor = !analysis ? "text-zinc-500" :
-            analysis.score >= 75 ? "text-green-400" :
-            analysis.score >= 55 ? "text-amber-400" : "text-red-400";
+          const analysis = scan.analyses?.[0];
           return (
             <button
               key={scan.id}
@@ -1108,7 +872,7 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
                 </div>
                 {analysis && (
                   <div className="text-right flex-shrink-0">
-                    <p className={`text-xl font-black tabular-nums leading-none ${scoreColor}`}>{analysis.score}</p>
+                    <p className={`text-xl font-black tabular-nums leading-none ${scorePillClass(analysis.score).split(" ")[0]}`}>{analysis.score}</p>
                     <p className="text-[10px] text-zinc-600">/100</p>
                   </div>
                 )}
@@ -1127,84 +891,13 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
   );
 }
 
-// ── Profile tab ───────────────────────────────────────────────────────────────
-function ProfileTab({ data }: { data: DashboardData | null }) {
-  const rank  = data ? detectiveRank(data.avgScore) : "Rookie";
-  const total = data?.totalSavings ?? 0;
-  const count = data?.receiptsScanned ?? 0;
-  const avg   = data?.avgScore ?? 0;
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-5 pt-3 pb-6 space-y-4 max-w-sm mx-auto">
-
-        {/* Avatar */}
-        <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col items-center gap-4"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0ms both" }}
-        >
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(109,40,217,0.15)", border: "2px solid rgba(109,40,217,0.35)", fontSize: 36 }}
-          >
-            🕵️
-          </div>
-          <div className="text-center">
-            <p className="text-xl font-black text-white">Detective</p>
-            <p className="text-violet-400 text-sm font-bold mt-0.5">{rank}</p>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div
-          className="grid grid-cols-2 gap-3"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 100ms both" }}
-        >
-          <div className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1">Total Saved</p>
-            <p className="text-2xl font-black text-violet-400 tabular-nums">${total.toFixed(2)}</p>
-            <p className="text-[10px] text-zinc-600 mt-0.5">lifetime</p>
-          </div>
-          <div className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1">Cases</p>
-            <p className="text-2xl font-black tabular-nums">{count}</p>
-            <p className="text-[10px] text-zinc-600 mt-0.5">solved</p>
-          </div>
-        </div>
-
-        {/* Info */}
-        <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 200ms both" }}
-        >
-          {[
-            ["Member since",    "June 2025"],
-            ["Avg efficiency",  `${avg}/100`],
-            ["Specialty",       "Price Analysis"],
-          ].map(([label, value]) => (
-            <div key={label} className="flex justify-between items-center px-4 py-3.5">
-              <span className="text-sm text-zinc-500">{label}</span>
-              <span className="text-sm font-bold text-zinc-300">{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Settings tab ──────────────────────────────────────────────────────────────
 function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex items-center justify-between px-4 py-3.5">
       <span className="text-sm font-medium text-zinc-300">{label}</span>
-      <button
-        onClick={() => onChange(!value)}
-        className={`w-11 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${value ? "bg-violet-500" : "bg-zinc-700"}`}
-      >
-        <span
-          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${value ? "translate-x-[22px]" : "translate-x-0.5"}`}
-        />
+      <button onClick={() => onChange(!value)} className={`w-11 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${value ? "bg-violet-500" : "bg-zinc-700"}`}>
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${value ? "translate-x-[22px]" : "translate-x-0.5"}`} />
       </button>
     </div>
   );
@@ -1213,44 +906,25 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 function SettingsTab() {
   const [notif, setNotif] = useState(true);
   const [dark,  setDark]  = useState(true);
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="px-5 pt-3 pb-6 space-y-4 max-w-sm mx-auto">
-
-        <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0ms both" }}
-        >
+        <div className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/[0.06]" style={{ animation: "cardIn 0.5s ease-out 0ms both" }}>
           <ToggleRow label="Notifications" value={notif} onChange={setNotif} />
           <ToggleRow label="Dark Mode"     value={dark}  onChange={setDark}  />
         </div>
-
-        <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 100ms both" }}
-        >
+        <div className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/[0.06]" style={{ animation: "cardIn 0.5s ease-out 100ms both" }}>
           <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">About</p>
-          {[
-            ["App",         "Receipt Detective"],
-            ["Version",     "1.0.0"],
-            ["Powered by",  "Claude AI"],
-          ].map(([label, value]) => (
+          {[["App", "Receipt Detective"], ["Version", "1.0.0"], ["Powered by", "Claude AI"]].map(([label, value]) => (
             <div key={label} className="flex justify-between items-center px-4 py-3.5">
               <span className="text-sm text-zinc-500">{label}</span>
               <span className="text-sm font-bold text-zinc-300">{value}</span>
             </div>
           ))}
         </div>
-
-        <div
-          className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4"
-          style={{ animation: "cardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 200ms both" }}
-        >
+        <div className="bg-white/[0.05] backdrop-blur-xl border border-white/10 rounded-2xl p-4" style={{ animation: "cardIn 0.5s ease-out 200ms both" }}>
           <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-2">Legal</p>
-          <p className="text-xs text-zinc-600 leading-relaxed">
-            Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.
-          </p>
+          <p className="text-xs text-zinc-600 leading-relaxed">Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.</p>
         </div>
       </div>
     </div>
@@ -1278,10 +952,7 @@ export default function Home() {
 
   const finishScan = useCallback(() => {
     setScanning(false);
-    if (resultRef.current) {
-      setResult(resultRef.current);
-      setShowResult(true);
-    }
+    if (resultRef.current) { setResult(resultRef.current); setShowResult(true); }
   }, []);
   finishRef.current = finishScan;
 
@@ -1303,32 +974,22 @@ export default function Home() {
       try {
         let extracted: ExtractedReceipt | null = null;
         if (scannedFile?.base64) {
-          const res  = await fetch("/api/upload-receipt", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: scannedFile.base64 }),
-          });
-          const upd  = await res.json();
+          const res = await fetch("/api/upload-receipt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: scannedFile.base64 }) });
+          const upd = await res.json();
           if (!res.ok || upd.error) throw new Error(upd.error ?? `Upload failed (${res.status})`);
           extracted = upd as ExtractedReceipt;
           setReceiptData(extracted);
         }
-
-        const ar   = await fetch("/api/analyze-receipt", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: extracted?.items ?? null }),
-        });
-        const raw  = await ar.json();
-        if (!ar.ok || raw.error) throw new Error(raw.error ?? `Analysis failed (${ar.status})`);
-        if (!raw.categories)     throw new Error("Analysis returned unexpected format.");
-
+        const ar  = await fetch("/api/analyze-receipt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: extracted?.items ?? null }) });
+        const raw = await ar.json();
+        if (!ar.ok || raw.error)  throw new Error(raw.error ?? `Analysis failed (${ar.status})`);
+        if (!raw.categories)      throw new Error("Analysis returned unexpected format.");
         resultRef.current = raw as AnalysisResult;
         setResult(raw as AnalysisResult);
         ok = true;
-
-        saveScanToDb(extracted, raw as AnalysisResult, scannedFile?.base64)
-          .catch(err => console.warn("Supabase save failed:", err));
+        saveScanToDb(extracted, raw as AnalysisResult, scannedFile?.base64).catch(err => console.warn("Supabase save failed:", err));
       } catch (err) {
-        const msg        = err instanceof Error ? err.message : "Scan failed. Please try again.";
+        const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
         console.error("[scan] pipeline error:", err);
         scanErrorRef.current = msg;
         setScanError(msg);
@@ -1337,97 +998,51 @@ export default function Home() {
         if (ok && progressDone.current) finishRef.current();
       }
     };
-
     run();
   }, [scanning, scannedFile]);
 
-  const handleScan = useCallback((file: ScannedFile) => {
-    if (scanning) return;
-    setScannedFile(file);
-    setReceiptData(null);
-    setScanError(null);
-    setScanning(true);
-  }, [scanning]);
-
-  const handleRetry = useCallback(() => {
-    setScanning(false);
-    setScanError(null);
-    setScannedFile(null);
-  }, []);
-
-  const handleCloseResult = useCallback(() => {
-    setShowResult(false);
-    setRefreshKey(k => k + 1);
-  }, []);
-
+  const handleScan        = useCallback((file: ScannedFile) => { if (scanning) return; setScannedFile(file); setReceiptData(null); setScanError(null); setScanning(true); }, [scanning]);
+  const handleRetry       = useCallback(() => { setScanning(false); setScanError(null); setScannedFile(null); }, []);
+  const handleCloseResult = useCallback(() => { setShowResult(false); setRefreshKey(k => k + 1); }, []);
   const handleViewHistory = useCallback(() => setActiveTab("history"), []);
-
-  const handleViewResult = useCallback((r: AnalysisResult) => {
-    setResult(r);
-    setShowResult(true);
-  }, []);
+  const handleViewResult  = useCallback((r: AnalysisResult) => { setResult(r); setShowResult(true); }, []);
 
   const tabSubtitle: Record<NavTab, string> = {
     home:     "Your price intelligence agency",
     history:  "Case files",
-    profile:  "Your profile",
     settings: "Configuration",
   };
 
   return (
     <div className="min-h-screen text-white font-sans flex flex-col" style={NAVY}>
-      {/* Ambient orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/[0.06] rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-0 w-72 h-72 bg-indigo-600/[0.04] rounded-full blur-[90px]" />
       </div>
 
-      {/* Header */}
       <div className="relative z-10 px-5 pt-12 pb-3 flex-shrink-0 border-b border-white/[0.05]">
         <h1 className="text-[22px] font-black tracking-tight leading-none">RECEIPT DETECTIVE</h1>
         <p className="text-zinc-600 text-xs mt-1 font-medium">{tabSubtitle[activeTab]}</p>
       </div>
 
-      {/* Tab content */}
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
-        {activeTab === "home"     && (
-          <Dashboard
-            data={dashData}
-            loading={dashLoading}
-            onScan={handleScan}
-            onViewHistory={handleViewHistory}
-            onViewResult={handleViewResult}
-          />
-        )}
+        {activeTab === "home"     && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} onViewHistory={handleViewHistory} onViewResult={handleViewResult} />}
         {activeTab === "history"  && <HistoryTab onViewResult={handleViewResult} />}
-        {activeTab === "profile"  && <ProfileTab data={dashData} />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
 
-      {/* Bottom nav */}
       <div className="relative z-10 flex-shrink-0">
         <BottomNav active={activeTab} onTabChange={setActiveTab} />
       </div>
 
-      {/* Scan overlay (full screen) */}
       {scanning && (
         <div className="fixed inset-0 z-40">
-          <Scan
-            onProgressDone={handleProgressDone}
-            filename={scannedFile?.name}
-            error={scanError}
-            onRetry={handleRetry}
-          />
+          <Scan onProgressDone={handleProgressDone} filename={scannedFile?.name} error={scanError} onRetry={handleRetry} />
         </div>
       )}
 
-      {/* Result modal */}
       {showResult && result && (
-        <ResultModal
-          data={result ?? FALLBACK}
-          receipt={receiptData}
-          onClose={handleCloseResult}
-        />
+        <ResultModal data={result ?? FALLBACK} receipt={receiptData} onClose={handleCloseResult} />
       )}
     </div>
   );
