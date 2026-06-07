@@ -1179,7 +1179,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans flex flex-col" style={NAVY}>
+    <div className="h-[100dvh] text-white font-sans flex flex-col overflow-hidden" style={NAVY}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-600/[0.09] rounded-full blur-[140px]" />
         <div className="absolute top-1/3 right-0 w-80 h-80 bg-purple-600/[0.06] rounded-full blur-[100px]" />
