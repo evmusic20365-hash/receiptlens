@@ -682,56 +682,21 @@ function ResultModal({ open, data, receipt, onClose }: {
   );
 }
 
-// ── Swipe carousel ────────────────────────────────────────────────────────────
-function SwipeCarousel({ slides }: { slides: React.ReactNode[] }) {
-  const [idx, setIdx] = useState(0);
-  const touchX        = useRef<number | null>(null);
-  const n             = slides.length;
-
-  return (
-    <div className="flex-1 flex flex-col min-h-0 pt-3">
-      <div
-        className="flex-1 overflow-hidden min-h-0"
-        onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
-        onTouchEnd={(e) => {
-          if (touchX.current === null) return;
-          const dx = e.changedTouches[0].clientX - touchX.current;
-          touchX.current = null;
-          if (dx < -40 && idx < n - 1) setIdx(i => i + 1);
-          else if (dx > 40 && idx > 0) setIdx(i => i - 1);
-        }}>
-        <motion.div
-          className="flex h-full"
-          style={{ width: `${n * 100}%` }}
-          animate={{ x: `${-(idx / n) * 100}%` }}
-          transition={{ type: "spring", damping: 30, stiffness: 300 }}>
-          {slides.map((slide, i) => (
-            <div key={i} className="h-full overflow-y-auto px-5 pb-2" style={{ width: `${100 / n}%` }}>
-              {slide}
-            </div>
-          ))}
-        </motion.div>
-      </div>
-      <div className="flex justify-center items-center gap-2 py-3 flex-shrink-0">
-        {slides.map((_, i) => (
-          <motion.button
-            key={i}
-            onClick={() => setIdx(i)}
-            className="rounded-full"
-            style={{ height: 6, backgroundColor: i === idx ? "#a78bfa" : "#52525b" }}
-            animate={{ width: i === idx ? 20 : 6, opacity: i === idx ? 1 : 0.45 }}
-            transition={{ duration: 0.22 }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+// ── Quick tips ────────────────────────────────────────────────────────────────
+const QUICK_TIPS = [
+  "Store brands use identical ingredients — 30% cheaper, case closed.",
+  "Check unit price labels, not sticker price. Bigger isn't always the deal.",
+  "Mid-week produce hits peak markdown. Wednesday is your day.",
+  "Screenshot price-match policies before checkout. They expire fast.",
+  "Loyalty apps hide unadvertised deals — always check before you scan.",
+  "Frozen vegetables: same nutrition, half the price. Not a compromise.",
+  "Buy in bulk only what you'll finish. Waste is the enemy of savings.",
+] as const;
 
 // ── Dashboard (Home tab) ──────────────────────────────────────────────────────
-function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
+function Dashboard({ data, loading, onScan }: {
   data: DashboardData | null; loading: boolean;
-  onScan: (f: ScannedFile) => void; onViewHistory: () => void; onViewResult: (r: AnalysisResult) => void;
+  onScan: (f: ScannedFile) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cbRef   = useRef(onScan);
@@ -746,232 +711,147 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
     e.target.value = "";
   };
 
-  const isEmpty = !loading && (data?.receiptsScanned ?? 0) === 0;
+  const [tip, setTip] = useState<string>(QUICK_TIPS[0]);
+  useEffect(() => { setTip(QUICK_TIPS[new Date().getDay() % QUICK_TIPS.length]); }, []);
+
   const rank    = data?.avgScore != null ? detectiveRank(data.avgScore) : null;
-  const MEDALS  = ["🥇", "🥈", "🥉"] as const;
+  const hasData = !!data && data.receiptsScanned > 0;
+  const scoreColor = hasData
+    ? (data!.avgScore >= 75 ? "text-green-400" : data!.avgScore >= 55 ? "text-amber-400" : "text-red-400")
+    : "text-zinc-700";
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <motion.div className="flex-1 flex flex-col overflow-hidden px-5 pt-4 pb-3 gap-2.5"
+      variants={staggerV} initial="hidden" animate="show">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
-      {/* ── Static top section ── */}
-      <motion.div className="flex-shrink-0 px-5 pt-4 space-y-3"
-        variants={staggerV} initial="hidden" animate="show">
-
-        {/* ① Greeting */}
-        <motion.div variants={cardV} className="flex items-center gap-3 min-h-[40px]">
-          <motion.img
-            src="/mascot-default.png" alt=""
-            className="w-[52px] h-[52px] object-contain flex-shrink-0"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}
-          />
-          <span className="text-[20px] font-black text-white leading-none">Hey Detective</span>
-          {rank && (
-            <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
-              {rank}
-            </Badge>
-          )}
-          <div className="flex-1" />
-          {(data?.streak ?? 0) > 0 && (
-            <span className="text-sm font-black text-orange-400 flex-shrink-0">{data!.streak}🔥</span>
-          )}
-        </motion.div>
-
-        {/* ② SCAN NOW — compact horizontal */}
-        <motion.div variants={cardV} className="relative">
-          <div className="absolute inset-0 rounded-[22px] pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 60%, rgba(109,40,217,0.5) 0%, transparent 70%)", filter: "blur(14px)" }} />
-          <motion.div
-            className="absolute -inset-[6px] rounded-[26px] pointer-events-none"
-            style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.55), rgba(167,139,250,0.3))", filter: "blur(12px)" }}
-            animate={{ opacity: [0.35, 0.72, 0.35], scale: [1, 1.03, 1] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <div className="relative p-[1.5px] rounded-[22px] overflow-hidden">
-            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #7c3aed, #c4b5fd, #6d28d9)" }} />
-            <motion.button
-              onClick={() => fileRef.current?.click()}
-              whileTap={{ scale: 0.975 }}
-              whileHover={{ scale: 1.012 }}
-              animate={{
-                boxShadow: [
-                  "0 0 20px rgba(124,58,237,0.3), 0 0 50px rgba(124,58,237,0.1)",
-                  "0 0 40px rgba(124,58,237,0.6), 0 0 80px rgba(124,58,237,0.2)",
-                  "0 0 20px rgba(124,58,237,0.3), 0 0 50px rgba(124,58,237,0.1)",
-                ],
-              }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              className="relative w-full rounded-[21px] flex items-center gap-5 select-none overflow-hidden"
-              style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)", padding: "1.125rem 1.5rem" }}>
-              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 30% 50%, rgba(124,58,237,0.12) 0%, transparent 60%)" }} />
-              <motion.div
-                className="w-[54px] h-[54px] rounded-full flex items-center justify-center flex-shrink-0"
-                animate={{ boxShadow: ["0 0 0 0 rgba(139,92,246,0)", "0 0 0 10px rgba(139,92,246,0.12)", "0 0 0 0 rgba(139,92,246,0)"] }}
-                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-                style={{ background: "rgba(109,40,217,0.22)", border: "1.5px solid rgba(167,139,250,0.45)" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-[26px] h-[26px] text-violet-300">
-                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-              </motion.div>
-              <div className="relative">
-                <p className="text-[24px] font-black text-white leading-none tracking-tight">SCAN NOW</p>
-                <p className="text-zinc-400 text-[13px] mt-1 font-medium">
-                  {isEmpty ? "Start your first investigation" : "Tap to investigate prices"}
-                </p>
-              </div>
-            </motion.button>
-          </div>
-        </motion.div>
-
-        {/* ③ Widget grid 2×2 */}
-        <motion.div variants={staggerV} className="grid grid-cols-2 gap-3">
-
-          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
-            className="h-[120px] rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(34,197,94,0.08), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
-            <p className="text-[10px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
-            <div>
-              <p className="text-[30px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_12px_rgba(34,197,94,0.4)]">
-                <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
-              </p>
-              <p className="text-[11px] text-green-500/50 mt-1 font-semibold">lifetime</p>
-            </div>
-          </motion.div>
-
-          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
-            className="h-[120px] rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(139,92,246,0.1), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
-            <p className="text-[10px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
-            <div>
-              <p className="text-[40px] font-black tabular-nums leading-none"
-                style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                <CountUpValue target={data?.receiptsScanned ?? 0} round />
-              </p>
-              <p className="text-[11px] text-violet-500/50 mt-1 font-semibold">receipts</p>
-            </div>
-          </motion.div>
-
-          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
-            className="h-[120px] rounded-3xl flex flex-col items-center justify-center gap-1.5 overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.045)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 1px rgba(139,92,246,0.18), 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07)" }}>
-            <AvgScoreWidget score={data?.avgScore ?? 0} hasData={!!data && data.receiptsScanned > 0} />
-          </motion.div>
-
-          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
-            className="h-[120px] rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(249,115,22,0.08), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
-            <p className="text-[10px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
-            <div>
-              <div className="flex items-end gap-1">
-                <span className="text-[24px] leading-none drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]">🔥</span>
-                <span className="text-[36px] font-black tabular-nums text-orange-400 leading-none drop-shadow-[0_0_12px_rgba(249,115,22,0.4)]">
-                  {data?.streak ?? 0}
-                </span>
-              </div>
-              <p className="text-[11px] text-orange-500/50 mt-1 font-semibold">day streak</p>
-            </div>
-          </motion.div>
-
-        </motion.div>
+      {/* ① Greeting — one compact line */}
+      <motion.div variants={cardV} className="flex items-center gap-2 flex-shrink-0 h-9">
+        <span className="text-[19px] font-black text-white leading-none">Hey Detective 🕵️</span>
+        {rank && (
+          <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
+            {rank}
+          </Badge>
+        )}
+        <div className="flex-1" />
+        {(data?.streak ?? 0) > 0 && (
+          <span className="text-[13px] font-black text-orange-400 flex-shrink-0">{data!.streak}🔥</span>
+        )}
       </motion.div>
 
-      {/* ── Swipe carousel: Store Rankings · Recent Cases · Smart Insight ── */}
-      <SwipeCarousel slides={[
-
-        <Card key="rankings" className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
-          <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase px-5 pt-4 pb-2">Store Rankings</p>
-          {(!data || data.receiptsScanned === 0) ? (
-            <div className="px-5 pb-5 pt-1 flex items-center gap-3 opacity-40">
-              <span className="text-xl">🏆</span>
-              <span className="text-sm text-zinc-500 italic">Scan receipts to unlock store rankings</span>
+      {/* ② SCAN NOW — hero, takes remaining flex space */}
+      <motion.div variants={cardV} className="relative flex-1 min-h-[160px]">
+        <div className="absolute inset-0 rounded-[22px] pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 50% 70%, rgba(109,40,217,0.55) 0%, transparent 68%)", filter: "blur(18px)" }} />
+        <motion.div
+          className="absolute -inset-[7px] rounded-[27px] pointer-events-none"
+          style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.6), rgba(167,139,250,0.3))", filter: "blur(14px)" }}
+          animate={{ opacity: [0.35, 0.78, 0.35], scale: [1, 1.03, 1] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <div className="relative h-full p-[1.5px] rounded-[22px] overflow-hidden">
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #7c3aed, #c4b5fd, #6d28d9)" }} />
+          <motion.button
+            onClick={() => fileRef.current?.click()}
+            whileTap={{ scale: 0.975 }}
+            whileHover={{ scale: 1.012 }}
+            animate={{
+              boxShadow: [
+                "0 0 24px rgba(124,58,237,0.3), 0 0 60px rgba(124,58,237,0.1)",
+                "0 0 50px rgba(124,58,237,0.65), 0 0 110px rgba(124,58,237,0.22)",
+                "0 0 24px rgba(124,58,237,0.3), 0 0 60px rgba(124,58,237,0.1)",
+              ],
+            }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            className="relative w-full h-full rounded-[21px] flex flex-col items-center justify-center gap-5 select-none overflow-hidden"
+            style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)" }}>
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at 50% 60%, rgba(124,58,237,0.14) 0%, transparent 65%)" }} />
+            <motion.div
+              className="w-[76px] h-[76px] rounded-full flex items-center justify-center"
+              animate={{ boxShadow: ["0 0 0 0 rgba(139,92,246,0)", "0 0 0 16px rgba(139,92,246,0.13)", "0 0 0 0 rgba(139,92,246,0)"] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              style={{ background: "rgba(109,40,217,0.22)", border: "1.5px solid rgba(167,139,250,0.45)" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-9 h-9 text-violet-300">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </motion.div>
+            <div className="relative text-center">
+              <p className="text-[30px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
+              <p className="text-zinc-400 text-[14px] mt-2 font-medium">
+                {hasData ? "Investigate your prices" : "Start your first case"}
+              </p>
             </div>
-          ) : (
-            <div className="divide-y divide-white/[0.05]">
-              {MEDALS.map((medal, i) => {
-                const store = data.storeRankings[i];
-                if (!store) return (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3 opacity-40">
-                    <span className="text-xl">{medal}</span>
-                    <span className="text-sm text-zinc-600 italic">Scan more to unlock</span>
-                  </div>
-                );
-                return (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3">
-                    <span className="text-xl flex-shrink-0">{medal}</span>
-                    <span className="flex-1 text-[15px] font-bold text-white truncate">{store.name}</span>
-                    <Badge variant="outline" className={`rounded-full text-[11px] font-bold flex-shrink-0 px-3 ${scorePillClass(store.avgScore)}`}>
-                      {store.avgScore}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>,
+          </motion.button>
+        </div>
+      </motion.div>
 
-        <Card key="cases" className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
-          <div className="flex items-center justify-between px-5 pt-4 pb-2">
-            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">Recent Cases</p>
-            {data && data.receiptsScanned > 0 && (
-              <Button variant="ghost" size="sm" onClick={onViewHistory}
-                className="text-violet-400 hover:text-violet-300 hover:bg-transparent h-auto p-0 text-[13px] font-bold">
-                View All →
-              </Button>
-            )}
+      {/* ③ Stats 2×2 — compact */}
+      <motion.div variants={staggerV} className="grid grid-cols-2 gap-2.5 flex-shrink-0">
+
+        <motion.div variants={cardV}
+          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)" }}>
+          <p className="text-[9px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
+          <p className="text-[26px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+            <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
+          </p>
+        </motion.div>
+
+        <motion.div variants={cardV}
+          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)" }}>
+          <p className="text-[9px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
+          <p className="text-[32px] font-black tabular-nums leading-none"
+            style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <CountUpValue target={data?.receiptsScanned ?? 0} round />
+          </p>
+        </motion.div>
+
+        <motion.div variants={cardV}
+          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}>
+          <p className="text-[9px] font-bold tracking-[0.18em] text-zinc-400/70 uppercase">Avg Score</p>
+          {hasData
+            ? <p className={`text-[32px] font-black tabular-nums leading-none ${scoreColor}`}>
+                <CountUpValue target={data!.avgScore} round />
+              </p>
+            : <p className="text-[32px] font-black leading-none text-zinc-700">—</p>}
+        </motion.div>
+
+        <motion.div variants={cardV}
+          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)" }}>
+          <p className="text-[9px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
+          <div className="flex items-end gap-1">
+            <span className="text-[18px] leading-none">🔥</span>
+            <span className="text-[32px] font-black tabular-nums text-orange-400 leading-none drop-shadow-[0_0_10px_rgba(249,115,22,0.4)]">
+              {data?.streak ?? 0}
+            </span>
           </div>
-          {(!data || data.recentCases.length === 0) ? (
-            <div className="px-5 pb-4 pt-1 flex flex-col items-center gap-2">
-              <motion.img src="/mascot-celebrating.png" alt=""
-                className="w-[80px] h-[80px] object-contain"
-                initial={{ opacity: 0 }} animate={{ opacity: 0.75 }} transition={{ duration: 0.5 }} />
-              <p className="text-sm text-zinc-500 italic text-center">No cases yet — scan your first receipt above</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-white/[0.05]">
-              {data.recentCases.map((scan) => {
-                const analysis = scan.analyses?.[0];
-                return (
-                  <motion.button key={scan.id} whileTap={{ backgroundColor: "rgba(255,255,255,0.05)" }}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/[0.03] transition-colors text-left"
-                    onClick={() => analysis && onViewResult(analysisFromDb(analysis))}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-bold text-white truncate">{scan.store_name || "Unknown Store"}</p>
-                      <p className="text-[12px] text-zinc-500 mt-0.5">
-                        {new Date(scan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </p>
-                    </div>
-                    {analysis && (
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[12px] font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
-                        <Badge variant="outline" className={`rounded-full text-[10px] font-bold px-2 ${scorePillClass(analysis.score)}`}>
-                          {analysis.score}
-                        </Badge>
-                      </div>
-                    )}
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-600 flex-shrink-0">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </motion.button>
-                );
-              })}
-            </div>
-          )}
-        </Card>,
+        </motion.div>
 
-        <Card key="insight" className="rounded-2xl shadow-none text-white p-5 flex gap-4 items-start" style={GLASS}>
-          <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 text-lg leading-none">
-            💡
-          </div>
-          <div>
-            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase mb-2">Smart Insight</p>
-            <p className="text-[14px] text-zinc-300 leading-relaxed">
-              {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
-            </p>
-          </div>
-        </Card>,
+      </motion.div>
 
-      ]} />
-    </div>
+      {/* ④ Smart Insight */}
+      <motion.div variants={cardV}
+        className="flex-shrink-0 rounded-2xl px-4 py-3 flex gap-3 items-center" style={GLASS}>
+        <span className="text-[18px] leading-none flex-shrink-0">💡</span>
+        <p className="text-[12px] text-zinc-300 leading-snug line-clamp-2">
+          {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
+        </p>
+      </motion.div>
+
+      {/* ⑤ Quick Tip */}
+      <motion.div variants={cardV}
+        className="flex-shrink-0 rounded-2xl px-4 py-3 flex gap-3 items-center"
+        style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.18)", backdropFilter: "blur(20px)" }}>
+        <span className="text-[18px] leading-none flex-shrink-0">🕵️</span>
+        <p className="text-[12px] text-zinc-300 leading-snug line-clamp-2">{tip}</p>
+      </motion.div>
+
+    </motion.div>
   );
 }
 
@@ -1197,7 +1077,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex-1 flex flex-col overflow-hidden">
-            {activeTab === "home"     && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} onViewHistory={handleViewHistory} onViewResult={handleViewResult} />}
+            {activeTab === "home"     && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} />}
             {activeTab === "history"  && <HistoryTab onViewResult={handleViewResult} />}
             {activeTab === "settings" && <SettingsTab />}
           </motion.div>
