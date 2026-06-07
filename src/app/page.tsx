@@ -721,7 +721,9 @@ function Dashboard({ data, loading, onScan }: {
     : "text-zinc-700";
 
   return (
-    <motion.div className="flex-1 flex flex-col overflow-hidden px-4 pt-10 pb-2 gap-2"
+    <motion.div
+      className="flex-1 flex flex-col overflow-hidden px-4 pb-2 gap-2"
+      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 2.5rem)" }}
       variants={staggerV} initial="hidden" animate="show">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
@@ -1075,7 +1077,7 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      <div className="relative z-10 flex-shrink-0">
+      <div className="relative z-10 flex-shrink-0" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <BottomNav active={activeTab} onTabChange={setActiveTab} />
       </div>
 
