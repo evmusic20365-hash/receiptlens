@@ -345,13 +345,15 @@ function Scan({ onProgressDone, filename, error, onRetry }: {
         <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">{error ? "Error" : "On The Case"}</span>
       </div>
       <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-8">
-        <motion.img
-          src="/mascot.png"
-          alt="Detective scanning"
-          className="w-[200px] h-[200px] object-contain"
-          animate={{ y: [0, -12, 0] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-        />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+          <motion.img
+            src="/mascot-default.png" alt=""
+            className="w-[200px] h-[200px] object-contain"
+            style={{ mixBlendMode: "screen" }}
+            animate={{ y: [0, -12, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
         <div className="w-full max-w-sm space-y-5">
           {error ? (
             <>
@@ -594,6 +596,20 @@ function ResultModal({ open, data, receipt, onClose }: {
                   <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0 mr-2" />
                   {scoreLabel}
                 </Badge>
+                {data.score >= 75 && (
+                  <motion.img src="/mascot-thumbsup.png" alt=""
+                    className="w-[120px] h-[120px] object-contain mt-3"
+                    style={{ mixBlendMode: "screen" }}
+                    initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }} />
+                )}
+                {data.score < 50 && (
+                  <motion.img src="/mascot-confused.png" alt=""
+                    className="w-[120px] h-[120px] object-contain mt-3"
+                    style={{ mixBlendMode: "screen" }}
+                    initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }} />
+                )}
                 <div className="flex items-center gap-8 mt-5 pt-4 border-t border-white/[0.06] w-full justify-center">
                   <div className="text-center">
                     <p className="text-[9px] text-zinc-600 uppercase tracking-[0.2em] font-bold mb-1">Savings Found</p>
@@ -699,7 +715,12 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
 
         {/* ① Greeting */}
         <motion.div variants={cardV} className="flex items-center gap-3 min-h-[40px]">
-          <img src="/mascot.png" alt="Detective" className="w-[60px] h-[60px] object-contain flex-shrink-0" />
+          <motion.img
+            src="/mascot-default.png" alt=""
+            className="w-[60px] h-[60px] object-contain flex-shrink-0"
+            style={{ mixBlendMode: "screen" }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}
+          />
           <span className="text-[22px] font-black text-white leading-none">Hey Detective</span>
           {rank && (
             <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
@@ -862,8 +883,11 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
               )}
             </div>
             {(!data || data.recentCases.length === 0) ? (
-              <div className="px-5 pb-6 pt-2 flex flex-col items-center gap-3 opacity-50">
-                <img src="/mascot.png" alt="Detective" className="w-[120px] h-[120px] object-contain" />
+              <div className="px-5 pb-6 pt-2 flex flex-col items-center gap-3">
+                <motion.img src="/mascot-celebrating.png" alt=""
+                  className="w-[120px] h-[120px] object-contain"
+                  style={{ mixBlendMode: "screen" }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 0.75 }} transition={{ duration: 0.5 }} />
                 <p className="text-sm text-zinc-500 italic text-center">No cases yet — scan your first receipt above</p>
               </div>
             ) : (
@@ -943,7 +967,10 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
 
   if (!scans.length) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <img src="/mascot.png" alt="Detective" className="w-[120px] h-[120px] object-contain opacity-50" />
+      <motion.img src="/mascot-celebrating.png" alt=""
+        className="w-[120px] h-[120px] object-contain"
+        style={{ mixBlendMode: "screen" }}
+        initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} transition={{ duration: 0.5 }} />
       <p className="text-zinc-400 font-bold">No cases yet.</p>
       <p className="text-zinc-600 text-sm">Scan your first receipt on the Home tab.</p>
     </div>
