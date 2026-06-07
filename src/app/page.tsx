@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -311,6 +311,330 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
   );
 }
 
+// ── Newspaper SVG ─────────────────────────────────────────────────────────────
+function NewspaperSVG({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 40 52" fill="none" className={className}>
+      <rect width="40" height="52" rx="2" fill="#e8d9b5"/>
+      <rect x="3" y="3" width="34" height="8" rx="1" fill="#7a5c1e" opacity="0.9"/>
+      <rect x="5" y="4.5" width="30" height="1.5" fill="#e8d9b5" opacity="0.5"/>
+      <rect x="3" y="14" width="34" height="3" rx="0.5" fill="#4a3510" opacity="0.7"/>
+      {[20,25,30,35].map(y => (
+        <g key={y}>
+          <rect x="3" y={y} width="16" height="1.5" rx="0.5" fill="#6b4a18" opacity="0.45"/>
+          <rect x="22" y={y} width="15" height="1.5" rx="0.5" fill="#6b4a18" opacity="0.45"/>
+        </g>
+      ))}
+      <rect x="3" y="41" width="20" height="8" rx="1" fill="#c4a870" opacity="0.3"/>
+    </svg>
+  );
+}
+
+// ── Fedora hat SVG ────────────────────────────────────────────────────────────
+function FedoraSVG({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 56 32" fill="none" className={className}>
+      <ellipse cx="28" cy="27" rx="27" ry="5.5" fill="#1a0d3a"/>
+      <path d="M8,25 C8,25 10,4 28,4 C46,4 48,25 48,25 Z" fill="#120926"/>
+      <path d="M10,21 C10,21 13,17 28,17 C43,17 46,21 46,21" stroke="#a855f7" strokeWidth="2.5" fill="none" opacity="0.75"/>
+      <path d="M14,12 Q18,6 28,5 C24,9 16,11 14,12 Z" fill="white" opacity="0.07"/>
+    </svg>
+  );
+}
+
+// ── Retro neon city dusk skyline ──────────────────────────────────────────────
+function CityBackground({ opacity = 1 }: { opacity?: number }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity }} aria-hidden>
+      <svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 w-full h-full">
+        <defs>
+          <linearGradient id="cb-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#07021a"/>
+            <stop offset="18%"  stopColor="#0f053a"/>
+            <stop offset="38%"  stopColor="#2a0e4a"/>
+            <stop offset="54%"  stopColor="#4d1420"/>
+            <stop offset="68%"  stopColor="#7e2a10"/>
+            <stop offset="80%"  stopColor="#b04a1a"/>
+            <stop offset="90%"  stopColor="#c86020"/>
+            <stop offset="100%" stopColor="#0a0818"/>
+          </linearGradient>
+          <radialGradient id="cb-moon-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stopColor="#f5e6c8" stopOpacity="0.25"/>
+            <stop offset="100%" stopColor="#f5e6c8" stopOpacity="0"/>
+          </radialGradient>
+          <linearGradient id="cb-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#0c0920"/>
+            <stop offset="100%" stopColor="#060412"/>
+          </linearGradient>
+          <linearGradient id="cb-road-glow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stopColor="#a855f7" stopOpacity="0"/>
+            <stop offset="50%"  stopColor="#a855f7" stopOpacity="0.2"/>
+            <stop offset="100%" stopColor="#a855f7" stopOpacity="0"/>
+          </linearGradient>
+          <filter id="cb-glow">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          </filter>
+        </defs>
+
+        {/* Sky */}
+        <rect width="800" height="500" fill="url(#cb-sky)"/>
+        {/* Horizon glow */}
+        <ellipse cx="400" cy="385" rx="480" ry="95" fill="#c86020" opacity="0.12"/>
+        <ellipse cx="400" cy="392" rx="350" ry="52" fill="#e07030" opacity="0.08"/>
+
+        {/* Moon */}
+        <circle cx="650" cy="72" r="30" fill="#f5e0b8" opacity="0.88"/>
+        <circle cx="641" cy="65" r="30" fill="#9a7840" opacity="0.22"/>
+        <circle cx="650" cy="72" r="64" fill="url(#cb-moon-glow)"/>
+
+        {/* Stars */}
+        {[[45,35,1.5],[115,18,1.1],[185,47,1.4],[255,28,1.0],[340,12,1.6],[420,38,1.1],
+           [510,22,1.4],[580,50,1.0],[695,30,1.7],[755,16,1.2],[28,72,1.0],[785,55,1.3]].map(([x,y,r],i) => (
+          <circle key={i} cx={x} cy={y} r={r} fill="white" opacity={0.42 + (i % 4) * 0.1}/>
+        ))}
+
+        {/* Far background buildings */}
+        <rect x="0"   y="205" width="72"  height="180" fill="#0d0a22"/>
+        <rect x="68"  y="172" width="52"  height="213" fill="#0d0a22"/>
+        <rect x="118" y="228" width="48"  height="157" fill="#0d0a22"/>
+        <rect x="560" y="195" width="70"  height="190" fill="#0d0a22"/>
+        <rect x="628" y="162" width="88"  height="223" fill="#0d0a22"/>
+        <rect x="714" y="215" width="92"  height="170" fill="#0d0a22"/>
+
+        {/* Left Art Deco tower with antenna */}
+        <rect x="-18" y="270" width="128" height="115" fill="#09061a"/>
+        <rect x="2"   y="234" width="88"  height="38"  fill="#09061a"/>
+        <rect x="18"  y="198" width="56"  height="38"  fill="#09061a"/>
+        <rect x="32"  y="163" width="28"  height="37"  fill="#09061a"/>
+        <rect x="39"  y="145" width="14"  height="20"  fill="#09061a"/>
+        <rect x="45"  y="98"  width="2"   height="48"  fill="#09061a"/>
+        <rect x="42"  y="97"  width="8"   height="3"   fill="#09061a"/>
+        <circle cx="46" cy="94" r="3.5" fill="#a855f7" opacity="0.95" filter="url(#cb-glow)"/>
+
+        {/* Center-left building with amber windows */}
+        <rect x="128" y="150" width="92"  height="235" fill="#09061a"/>
+        <rect x="128" y="124" width="92"  height="28"  fill="#09061a"/>
+        <rect x="142" y="102" width="64"  height="24"  fill="#09061a"/>
+        {[150,176,202,228,254,280,306].map(y => (
+          <g key={y}>
+            <rect x="142" y={y} width="9" height="11" rx="1" fill="#f59e0b" opacity="0.3"/>
+            <rect x="158" y={y} width="9" height="11" rx="1" fill="#f59e0b" opacity="0.18"/>
+            <rect x="196" y={y} width="9" height="11" rx="1" fill="#f59e0b" opacity="0.24"/>
+          </g>
+        ))}
+
+        {/* DETECTIVE neon sign building */}
+        <rect x="242" y="183" width="118" height="202" fill="#07041a"/>
+        <rect x="242" y="152" width="118" height="33"  fill="#07041a"/>
+        <rect x="256" y="128" width="90"  height="26"  fill="#07041a"/>
+        <rect x="249" y="193" width="104" height="22" rx="2" fill="#a855f7" opacity="0.07"/>
+        <rect x="249" y="193" width="104" height="22" rx="2" fill="none" stroke="#a855f7" strokeWidth="1.5" opacity="0.8"/>
+        {[0,12,24,36,48,60,72,84,94].map((xo,i) => (
+          <rect key={i} x={253+xo} y="198" width={i<8?8:6} height="11" rx="1" fill="#a855f7" opacity="0.65"/>
+        ))}
+        {[226,252,278,304,330].map(y => (
+          <g key={y}>
+            <rect x="256" y={y} width="8" height="10" rx="1" fill="#a855f7" opacity="0.22"/>
+            <rect x="272" y={y} width="8" height="10" rx="1" fill="#f59e0b" opacity="0.18"/>
+            <rect x="332" y={y} width="8" height="10" rx="1" fill="#a855f7" opacity="0.2"/>
+          </g>
+        ))}
+
+        {/* Center building with retro billboard */}
+        <rect x="382" y="218" width="90"  height="167" fill="#09061a"/>
+        <rect x="382" y="196" width="90"  height="24"  fill="#09061a"/>
+        <rect x="388" y="160" width="78"  height="38"  rx="2" fill="#0e0928" stroke="#6d28d9" strokeWidth="1" opacity="0.85"/>
+        {[165,173,181,189].map((y,i) => (
+          <rect key={i} x="393" y={y} width={44-i*4} height="2" rx="1" fill="#7c3aed" opacity="0.5"/>
+        ))}
+
+        {/* Tall right building with red blinker */}
+        <rect x="498" y="128" width="88"  height="257" fill="#09061a"/>
+        <rect x="512" y="102" width="60"  height="28"  fill="#09061a"/>
+        <rect x="525" y="80"  width="34"  height="24"  fill="#09061a"/>
+        <rect x="541" y="36"  width="2"   height="45"  fill="#09061a"/>
+        <circle cx="542" cy="34" r="2.5" fill="#ef4444" opacity="0.85"/>
+        {[146,171,196,221,246,271,296,321].map(y => (
+          <g key={y}>
+            <rect x="512" y={y} width="8" height="10" rx="1" fill="#f59e0b" opacity="0.22"/>
+            <rect x="528" y={y} width="8" height="10" rx="1" fill="#f59e0b" opacity="0.14"/>
+            <rect x="562" y={y} width="8" height="10" rx="1" fill="#a855f7" opacity="0.28"/>
+            <rect x="576" y={y} width="8" height="10" rx="1" fill="#f59e0b" opacity="0.18"/>
+          </g>
+        ))}
+
+        {/* Far right squat building */}
+        <rect x="620" y="250" width="200" height="135" fill="#07041a"/>
+
+        {/* Ground & road */}
+        <rect x="0" y="385" width="800" height="115" fill="url(#cb-ground)"/>
+        <rect x="0" y="402" width="800" height="58" fill="#0b0920"/>
+        <rect x="0" y="402" width="800" height="1.5" fill="rgba(255,175,30,0.4)"/>
+        <rect x="0" y="459" width="800" height="1.5" fill="rgba(255,175,30,0.4)"/>
+        {Array.from({length:20}).map((_,i) => (
+          <rect key={i} x={i*42} y="430" width="26" height="1.5" rx="0.75" fill="rgba(255,255,255,0.18)"/>
+        ))}
+        <rect x="0" y="400" width="800" height="62" fill="url(#cb-road-glow)" opacity="0.4"/>
+
+        {/* Cars with headlights */}
+        <g opacity="0.65">
+          <rect x="75"  y="408" width="68" height="22" rx="6" fill="#130a28"/>
+          <rect x="88"  y="400" width="44" height="10" rx="3" fill="#0d071e"/>
+          <ellipse cx="142" cy="418" rx="7"  ry="4.5" fill="#fff5cc" opacity="0.85"/>
+          <ellipse cx="142" cy="418" rx="22" ry="10"  fill="#fff5cc" opacity="0.05"/>
+          <ellipse cx="77"  cy="418" rx="4.5" ry="3"  fill="#dc2626" opacity="0.7"/>
+        </g>
+        <g opacity="0.5">
+          <rect x="340" y="410" width="62" height="20" rx="5" fill="#0c0820"/>
+          <rect x="352" y="402" width="42" height="9"  rx="3" fill="#080516"/>
+          <ellipse cx="401" cy="419" rx="6"  ry="4"   fill="#fff5cc" opacity="0.75"/>
+          <ellipse cx="401" cy="419" rx="20" ry="9"   fill="#fff5cc" opacity="0.04"/>
+          <ellipse cx="342" cy="419" rx="4"  ry="2.5" fill="#dc2626" opacity="0.6"/>
+        </g>
+        <g opacity="0.55">
+          <rect x="595" y="432" width="62" height="20" rx="5" fill="#0c0820"/>
+          <rect x="605" y="424" width="42" height="9"  rx="3" fill="#080516"/>
+          <ellipse cx="597" cy="441" rx="6"  ry="4"   fill="#fff5cc" opacity="0.78"/>
+          <ellipse cx="597" cy="441" rx="20" ry="9"   fill="#fff5cc" opacity="0.04"/>
+          <ellipse cx="655" cy="441" rx="4"  ry="2.5" fill="#dc2626" opacity="0.62"/>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+// ── Confetti burst ────────────────────────────────────────────────────────────
+const CONFETTI_COLORS = ["#a855f7","#f59e0b","#22c55e","#60a5fa","#f472b6","#ffffff","#fb923c"];
+
+function ConfettiBurst({ active }: { active: boolean }) {
+  const particles = useMemo(() =>
+    Array.from({ length: 28 }, (_, i) => ({
+      id:    i,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size:  4 + (i % 5) * 1.8,
+      round: i % 3 === 0,
+      vx:    (((i % 7) - 3) * 55) + (i % 2 === 0 ? 25 : -25),
+      vy:    -(55 + (i % 6) * 30),
+      spin:  ((i % 5) - 2) * 200,
+      delay: (i % 5) * 0.04,
+    }))
+  , []);
+
+  return (
+    <AnimatePresence>
+      {active && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
+          {particles.map(p => (
+            <motion.div
+              key={p.id}
+              style={{ position: "absolute", width: p.size, height: p.size, backgroundColor: p.color, borderRadius: p.round ? "50%" : "2px", left: "50%", bottom: 70 }}
+              initial={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
+              animate={{ opacity: [1, 1, 0], x: p.vx, y: [0, p.vy, p.vy + 220], rotate: p.spin }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.5, ease: "easeOut", delay: p.delay }}
+            />
+          ))}
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ── Newspaper animation specs ─────────────────────────────────────────────────
+const NP_SPECS = [
+  { xo: -55, yo: -50, dur: 1.4, rot: [0,28,-18,35,0],     dx: [0,12,-8,18,0],   dy: [0,-12,6,-16,0]  },
+  { xo:  28, yo: -38, dur: 1.1, rot: [-22,12,-30,18,-22],  dx: [0,-10,14,-6,0],  dy: [0,18,-10,12,0]  },
+  { xo: -32, yo: -16, dur: 1.7, rot: [18,-28,22,-12,18],   dx: [0,14,-18,8,0],   dy: [0,-22,10,-14,0] },
+  { xo:  55, yo: -58, dur: 0.9, rot: [0,-24,38,-12,0],     dx: [0,22,-12,16,0],  dy: [0,10,-22,6,0]   },
+  { xo:  12, yo: -70, dur: 1.3, rot: [-32,18,-24,32,-32],  dx: [0,-18,24,-10,0], dy: [0,12,-18,6,0]   },
+  { xo: -75, yo: -30, dur: 1.6, rot: [12,-38,18,-24,12],   dx: [0,16,-24,12,0],  dy: [0,-10,20,-12,0] },
+];
+
+// ── Road progress scene ───────────────────────────────────────────────────────
+function RoadProgressScene({ progress }: { progress: number }) {
+  const done       = progress >= 100;
+  const mascotLeft = Math.min(progress, 86);
+  const fedoraGone = progress > 64;
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: 188 }}>
+      {/* Road surface */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 68, background: "#0b0920" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.5, background: "rgba(255,170,25,0.45)" }}/>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1.5, background: "rgba(255,170,25,0.45)" }}/>
+        <div style={{ position: "absolute", top: "50%", left: 4, right: 4, marginTop: -1, display: "flex", gap: 10 }}>
+          {Array.from({ length: 22 }).map((_, i) => (
+            <div key={i} style={{ flex: 1, height: 2, background: "rgba(255,255,255,0.18)", borderRadius: 1 }}/>
+          ))}
+        </div>
+        <motion.div
+          style={{ position: "absolute", top: 0, bottom: 0, left: 0, background: "linear-gradient(90deg,rgba(109,40,217,0.0),rgba(168,85,247,0.38))", boxShadow: "0 0 18px rgba(168,85,247,0.5),0 -5px 18px rgba(168,85,247,0.22)" }}
+          animate={{ width: `${mascotLeft}%` }}
+          transition={{ ease: "linear", duration: 0.12 }}
+        />
+      </div>
+
+      {/* Mascot + newspapers container */}
+      <motion.div
+        style={{ position: "absolute", bottom: 62, width: 80 }}
+        animate={{ left: `calc(${mascotLeft}% - 40px)` }}
+        transition={{ ease: "linear", duration: 0.12 }}
+      >
+        {/* Flying newspapers */}
+        {NP_SPECS.map((np, i) => (
+          <motion.div
+            key={i}
+            style={{ position: "absolute", left: np.xo, top: np.yo, width: 34, zIndex: i % 2 === 0 ? 2 : 12 }}
+            animate={done
+              ? { x: (i - 2.5) * 72, y: -150, rotate: 400, opacity: 0 }
+              : { rotate: np.rot, x: np.dx, y: np.dy }
+            }
+            transition={done
+              ? { duration: 0.8, ease: "easeOut", delay: i * 0.06 }
+              : { duration: np.dur, repeat: Infinity, ease: "easeInOut" }
+            }
+          >
+            <NewspaperSVG className="w-full h-auto"/>
+          </motion.div>
+        ))}
+
+        {/* Fedora (blows off at 64%) */}
+        <motion.div
+          style={{ position: "absolute", left: 18, top: -24, width: 46, zIndex: 15 }}
+          animate={fedoraGone
+            ? { x: 72, y: -58, rotate: 200, opacity: 0 }
+            : { x: [0,-2,2,-1,0], y: [0,-2,1,-2,0], rotate: [-8,5,-8] }
+          }
+          transition={fedoraGone
+            ? { duration: 0.7, ease: "easeOut" }
+            : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+          }
+        >
+          <FedoraSVG className="w-full h-auto"/>
+        </motion.div>
+
+        {/* Detective mascot */}
+        <motion.img
+          src="/mascot-default.png"
+          alt=""
+          style={{ position: "relative", zIndex: 10, width: 80, height: 80, objectFit: "contain" }}
+          animate={done
+            ? { y: [0,-18,0,-10,0], scale: [1,1.08,1,1.04,1] }
+            : { y: [0,-4,0,-3,0] }
+          }
+          transition={done
+            ? { duration: 0.8, times: [0,0.25,0.5,0.75,1] }
+            : { duration: 0.32, repeat: Infinity, ease: "easeInOut" }
+          }
+        />
+      </motion.div>
+
+      <ConfettiBurst active={done}/>
+    </div>
+  );
+}
+
 // ── Scan overlay ──────────────────────────────────────────────────────────────
 function Scan({ onProgressDone, filename, error, onRetry }: {
   onProgressDone: () => void; filename?: string; error?: string | null; onRetry?: () => void;
@@ -338,63 +662,70 @@ function Scan({ onProgressDone, filename, error, onRetry }: {
   }, []);
 
   return (
-    <div className="min-h-screen text-white font-sans flex flex-col" style={NAVY}>
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-violet-600/[0.07] rounded-full blur-[80px]" />
-      </div>
-      <div className="relative px-6 pt-14 pb-4 flex items-end justify-between border-b border-white/[0.06]">
-        <h1 className="text-lg font-black tracking-tight">RECEIPT DETECTIVE</h1>
-        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">{error ? "Error" : "On The Case"}</span>
-      </div>
-      <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-8">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-          <motion.img
-            src="/mascot-default.png" alt=""
-            className="w-[200px] h-[200px] object-contain"
-            animate={{ y: [0, -12, 0] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </motion.div>
-        <div className="w-full max-w-sm space-y-5">
+    <div className="h-[100dvh] text-white font-sans flex flex-col relative overflow-hidden" style={NAVY}>
+      <CityBackground/>
+      <div className="relative z-10 flex-1 flex flex-col">
+        {/* Top bar */}
+        <div
+          className="flex-shrink-0 flex items-center justify-between px-5"
+          style={{ paddingTop: "max(env(safe-area-inset-top,0px),3rem)", paddingBottom: "0.75rem" }}
+        >
+          <span className="text-[10px] font-bold tracking-[0.28em] text-zinc-500 uppercase">Receipt Detective</span>
+          <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">
+            {error ? "Case Stalled" : "On The Case"}
+          </span>
+        </div>
+
+        {/* Main */}
+        <div className="flex-1 flex flex-col items-center justify-center px-5 gap-5">
           {error ? (
-            <>
-              <Card className="bg-red-500/10 border-red-500/30 rounded-2xl shadow-none text-white">
-                <div className="p-4">
-                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-[0.2em] mb-2">Investigation Failed</p>
-                  <p className="text-sm text-zinc-300 leading-relaxed">{error}</p>
-                </div>
-              </Card>
+            <div className="w-full max-w-sm space-y-4">
+              <div className="flex justify-center">
+                <motion.img
+                  src="/mascot-default.png" alt=""
+                  className="w-[130px] h-[130px] object-contain"
+                  animate={{ rotate: [-5,5,-5] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </div>
+              <div className="rounded-2xl p-4" style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.25)" }}>
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-[0.2em] mb-1.5">Investigation Failed</p>
+                <p className="text-sm text-zinc-300 leading-relaxed">{error}</p>
+              </div>
               {onRetry && (
-                <Button variant="outline" onClick={onRetry}
-                  className="w-full bg-white/[0.05] border-white/10 hover:bg-white/[0.08] text-zinc-300 py-4 h-auto rounded-2xl font-bold text-sm tracking-widest uppercase">
-                  TRY AGAIN
-                </Button>
+                <motion.button
+                  onClick={onRetry} whileTap={{ scale: 0.97 }}
+                  className="w-full py-4 rounded-2xl font-black text-[13px] tracking-widest uppercase text-zinc-300"
+                  style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }}>
+                  Try Again
+                </motion.button>
               )}
-            </>
+            </div>
           ) : (
             <>
-              <div>
-                <p className="text-[10px] font-bold tracking-[0.25em] text-zinc-600 uppercase mb-3">Status</p>
-                <div className="h-6 overflow-hidden">
-                  <p key={step} className="text-base font-semibold text-white animate-[fade-up_0.22s_ease-out_forwards]">
+              <div className="text-center w-full">
+                <p className="text-[10px] font-bold tracking-[0.28em] text-zinc-600 uppercase mb-3">Status</p>
+                <div className="h-7 overflow-hidden">
+                  <motion.p
+                    key={step}
+                    className="text-lg font-semibold text-white"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22 }}
+                  >
                     {SCAN_STEPS[step]}
-                  </p>
+                  </motion.p>
                 </div>
-                {filename && <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate">📎 {filename}</p>}
+                {filename && (
+                  <p className="text-[11px] text-zinc-600 font-mono mt-2 truncate max-w-[240px] mx-auto">{filename}</p>
+                )}
               </div>
-              <div className="space-y-2">
-                <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]"
-                    style={{ background: "linear-gradient(90deg, #7c3aed, #8b5cf6)" }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ ease: "linear", duration: 0.1 }}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">Progress</span>
-                  <span className="text-sm font-bold text-violet-400 tabular-nums">{progress}%</span>
-                </div>
+
+              <RoadProgressScene progress={progress}/>
+
+              <div className="flex justify-between items-center w-full max-w-xs">
+                <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider">Progress</span>
+                <span className="text-sm font-black text-violet-400 tabular-nums">{progress}%</span>
               </div>
             </>
           )}
@@ -1255,9 +1586,7 @@ export default function Home() {
   return (
     <div className="h-[100dvh] text-white font-sans flex flex-col overflow-hidden" style={NAVY}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-600/[0.09] rounded-full blur-[140px]" />
-        <div className="absolute top-1/3 right-0 w-80 h-80 bg-purple-600/[0.06] rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-indigo-600/[0.05] rounded-full blur-[90px]" />
+        <CityBackground opacity={0.22}/>
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
