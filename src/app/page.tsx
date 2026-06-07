@@ -721,13 +721,13 @@ function Dashboard({ data, loading, onScan }: {
     : "text-zinc-700";
 
   return (
-    <motion.div className="flex-1 flex flex-col overflow-hidden px-5 pt-4 pb-3 gap-2.5"
+    <motion.div className="flex-1 flex flex-col overflow-hidden px-4 pt-10 pb-2 gap-2"
       variants={staggerV} initial="hidden" animate="show">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
       {/* ① Greeting — one compact line */}
-      <motion.div variants={cardV} className="flex items-center gap-2 flex-shrink-0 h-9">
-        <span className="text-[19px] font-black text-white leading-none">Hey Detective 🕵️</span>
+      <motion.div variants={cardV} className="flex items-center gap-2 flex-shrink-0 h-8">
+        <span className="text-[17px] font-black text-white leading-none">Hey Detective 🕵️</span>
         {rank && (
           <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
             {rank}
@@ -763,23 +763,23 @@ function Dashboard({ data, loading, onScan }: {
               ],
             }}
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-            className="relative w-full h-full rounded-[21px] flex flex-col items-center justify-center gap-5 select-none overflow-hidden"
+            className="relative w-full h-full rounded-[21px] flex flex-col items-center justify-center gap-4 select-none overflow-hidden"
             style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)" }}>
             <div className="absolute inset-0 pointer-events-none"
               style={{ background: "radial-gradient(ellipse at 50% 60%, rgba(124,58,237,0.14) 0%, transparent 65%)" }} />
             <motion.div
-              className="w-[76px] h-[76px] rounded-full flex items-center justify-center"
-              animate={{ boxShadow: ["0 0 0 0 rgba(139,92,246,0)", "0 0 0 16px rgba(139,92,246,0.13)", "0 0 0 0 rgba(139,92,246,0)"] }}
+              className="w-[62px] h-[62px] rounded-full flex items-center justify-center"
+              animate={{ boxShadow: ["0 0 0 0 rgba(139,92,246,0)", "0 0 0 14px rgba(139,92,246,0.13)", "0 0 0 0 rgba(139,92,246,0)"] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               style={{ background: "rgba(109,40,217,0.22)", border: "1.5px solid rgba(167,139,250,0.45)" }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-9 h-9 text-violet-300">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-7 h-7 text-violet-300">
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
             </motion.div>
             <div className="relative text-center">
-              <p className="text-[30px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
-              <p className="text-zinc-400 text-[14px] mt-2 font-medium">
+              <p className="text-[26px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
+              <p className="text-zinc-400 text-[13px] mt-1.5 font-medium">
                 {hasData ? "Investigate your prices" : "Start your first case"}
               </p>
             </div>
@@ -788,45 +788,45 @@ function Dashboard({ data, loading, onScan }: {
       </motion.div>
 
       {/* ③ Stats 2×2 — compact */}
-      <motion.div variants={staggerV} className="grid grid-cols-2 gap-2.5 flex-shrink-0">
+      <motion.div variants={staggerV} className="grid grid-cols-2 gap-2 flex-shrink-0">
 
         <motion.div variants={cardV}
-          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
           style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)" }}>
-          <p className="text-[9px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
-          <p className="text-[26px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+          <p className="text-[8px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
+          <p className="text-[22px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_10px_rgba(34,197,94,0.4)]">
             <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
           </p>
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
           style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)" }}>
-          <p className="text-[9px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
-          <p className="text-[32px] font-black tabular-nums leading-none"
+          <p className="text-[8px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
+          <p className="text-[26px] font-black tabular-nums leading-none"
             style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             <CountUpValue target={data?.receiptsScanned ?? 0} round />
           </p>
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
           style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}>
-          <p className="text-[9px] font-bold tracking-[0.18em] text-zinc-400/70 uppercase">Avg Score</p>
+          <p className="text-[8px] font-bold tracking-[0.18em] text-zinc-400/70 uppercase">Avg Score</p>
           {hasData
-            ? <p className={`text-[32px] font-black tabular-nums leading-none ${scoreColor}`}>
+            ? <p className={`text-[26px] font-black tabular-nums leading-none ${scoreColor}`}>
                 <CountUpValue target={data!.avgScore} round />
               </p>
-            : <p className="text-[32px] font-black leading-none text-zinc-700">—</p>}
+            : <p className="text-[26px] font-black leading-none text-zinc-700">—</p>}
         </motion.div>
 
         <motion.div variants={cardV}
-          className="h-[78px] rounded-2xl p-3 flex flex-col justify-between overflow-hidden"
+          className="h-[62px] rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
           style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)" }}>
-          <p className="text-[9px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
+          <p className="text-[8px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
           <div className="flex items-end gap-1">
-            <span className="text-[18px] leading-none">🔥</span>
-            <span className="text-[32px] font-black tabular-nums text-orange-400 leading-none drop-shadow-[0_0_10px_rgba(249,115,22,0.4)]">
+            <span className="text-[15px] leading-none">🔥</span>
+            <span className="text-[26px] font-black tabular-nums text-orange-400 leading-none drop-shadow-[0_0_10px_rgba(249,115,22,0.4)]">
               {data?.streak ?? 0}
             </span>
           </div>
@@ -836,19 +836,19 @@ function Dashboard({ data, loading, onScan }: {
 
       {/* ④ Smart Insight */}
       <motion.div variants={cardV}
-        className="flex-shrink-0 rounded-2xl px-4 py-3 flex gap-3 items-center" style={GLASS}>
-        <span className="text-[18px] leading-none flex-shrink-0">💡</span>
-        <p className="text-[12px] text-zinc-300 leading-snug line-clamp-2">
+        className="flex-shrink-0 rounded-xl px-3 py-2.5 flex gap-2.5 items-center" style={GLASS}>
+        <span className="text-[15px] leading-none flex-shrink-0">💡</span>
+        <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2">
           {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
         </p>
       </motion.div>
 
       {/* ⑤ Quick Tip */}
       <motion.div variants={cardV}
-        className="flex-shrink-0 rounded-2xl px-4 py-3 flex gap-3 items-center"
+        className="flex-shrink-0 rounded-xl px-3 py-2.5 flex gap-2.5 items-center"
         style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.18)", backdropFilter: "blur(20px)" }}>
-        <span className="text-[18px] leading-none flex-shrink-0">🕵️</span>
-        <p className="text-[12px] text-zinc-300 leading-snug line-clamp-2">{tip}</p>
+        <span className="text-[15px] leading-none flex-shrink-0">🕵️</span>
+        <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2">{tip}</p>
       </motion.div>
 
     </motion.div>
@@ -1054,21 +1054,12 @@ export default function Home() {
   const handleViewHistory = useCallback(() => setActiveTab("history"), []);
   const handleViewResult  = useCallback((r: AnalysisResult) => { setResult(r); setShowResult(true); }, []);
 
-  const tabSubtitle: Record<NavTab, string> = {
-    home: "Your price intelligence agency", history: "Case files", settings: "Configuration",
-  };
-
   return (
     <div className="h-[100dvh] text-white font-sans flex flex-col overflow-hidden" style={NAVY}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-600/[0.09] rounded-full blur-[140px]" />
         <div className="absolute top-1/3 right-0 w-80 h-80 bg-purple-600/[0.06] rounded-full blur-[100px]" />
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-indigo-600/[0.05] rounded-full blur-[90px]" />
-      </div>
-
-      <div className="relative z-10 px-5 pt-12 pb-4 flex-shrink-0 border-b border-white/[0.06]">
-        <h1 className="text-[28px] font-black tracking-tight leading-none">RECEIPT DETECTIVE</h1>
-        <p className="text-zinc-500 text-[13px] mt-1.5 font-medium">{tabSubtitle[activeTab]}</p>
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
