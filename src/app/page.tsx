@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const cardV = {
-  hidden: { opacity: 0, y: 16, scale: 0.97 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, damping: 22, stiffness: 280 } },
+  hidden: { opacity: 0, y: 40, scale: 0.95 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, damping: 18, stiffness: 180 } },
 };
-const staggerV = { hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.04 } } };
+const staggerV = { hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.08 } } };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const RING_R = 72;
@@ -27,6 +27,14 @@ const SCAN_STEPS = [
 ] as const;
 
 const NAVY: React.CSSProperties = { background: "linear-gradient(160deg, #0a0e1a 0%, #131832 100%)" };
+
+// Glassmorphism card style — frosted glass floating on navy
+const GLASS: React.CSSProperties = {
+  background: "rgba(255,255,255,0.045)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  boxShadow: "0 0 0 1px rgba(139,92,246,0.22), 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)",
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ScannedFile      { name: string; base64: string; }
@@ -722,13 +730,13 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <motion.div className="px-5 pt-3 pb-8 space-y-4 max-w-sm mx-auto"
+      <motion.div className="px-5 pt-4 pb-10 space-y-5 max-w-sm mx-auto"
         variants={staggerV} initial="hidden" animate="show">
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
 
         {/* ① Greeting */}
-        <motion.div variants={cardV} className="flex items-center gap-2 min-h-[36px]">
-          <span className="text-[17px] font-black text-white leading-none">Hey Detective 🕵️</span>
+        <motion.div variants={cardV} className="flex items-center gap-2 min-h-[40px]">
+          <span className="text-[22px] font-black text-white leading-none">Hey Detective 🕵️</span>
           {rank && (
             <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(data!.avgScore)}`}>
               {rank}
@@ -742,31 +750,47 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
 
         {/* ② SCAN NOW hero */}
         <motion.div variants={cardV} className="relative">
+          {/* Radial glow pool behind button */}
+          <div className="absolute inset-0 rounded-[30px] pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 60%, rgba(109,40,217,0.55) 0%, transparent 70%)", filter: "blur(18px)" }} />
+          {/* Breathing outer halo */}
           <motion.div
-            className="absolute -inset-[5px] rounded-[30px] pointer-events-none"
-            style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.5), rgba(167,139,250,0.4))", filter: "blur(12px)" }}
-            animate={{ opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -inset-[8px] rounded-[34px] pointer-events-none"
+            style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.6), rgba(167,139,250,0.35))", filter: "blur(16px)" }}
+            animate={{ opacity: [0.35, 0.75, 0.35], scale: [1, 1.03, 1] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
           />
+          {/* Gradient border shell */}
           <div className="relative p-[1.5px] rounded-[26px] overflow-hidden">
-            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #6d28d9, #a78bfa, #6d28d9)" }} />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #7c3aed, #c4b5fd, #6d28d9)" }} />
             <motion.button
               onClick={() => fileRef.current?.click()}
-              whileTap={{ scale: 0.985 }}
-              animate={{ scale: [1, 1.008, 1] }}
-              transition={{ scale: { duration: 3, repeat: Infinity, ease: "easeInOut" } }}
-              className="relative w-full rounded-[25px] flex flex-col items-center justify-center gap-5 select-none"
-              style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)", minHeight: "38vh", padding: "2.5rem 1.5rem" }}>
-              <div className="w-24 h-24 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(109,40,217,0.18)", border: "1.5px solid rgba(167,139,250,0.35)" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="w-12 h-12 text-violet-400">
+              whileTap={{ scale: 0.975 }}
+              whileHover={{ scale: 1.012 }}
+              animate={{
+                boxShadow: [
+                  "0 0 24px rgba(124,58,237,0.35), 0 0 60px rgba(124,58,237,0.12)",
+                  "0 0 48px rgba(124,58,237,0.65), 0 0 100px rgba(124,58,237,0.22)",
+                  "0 0 24px rgba(124,58,237,0.35), 0 0 60px rgba(124,58,237,0.12)",
+                ],
+              }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              className="relative w-full rounded-[25px] flex flex-col items-center justify-center gap-6 select-none overflow-hidden"
+              style={{ background: "linear-gradient(160deg, #0f1225 0%, #131832 100%)", minHeight: "40vh", padding: "2.5rem 1.5rem" }}>
+              {/* Inner radial spotlight */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 40%, rgba(124,58,237,0.15) 0%, transparent 65%)" }} />
+              <motion.div
+                className="w-[100px] h-[100px] rounded-full flex items-center justify-center"
+                animate={{ boxShadow: ["0 0 0 0 rgba(139,92,246,0)", "0 0 0 14px rgba(139,92,246,0.12)", "0 0 0 0 rgba(139,92,246,0)"] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                style={{ background: "rgba(109,40,217,0.22)", border: "1.5px solid rgba(167,139,250,0.45)" }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-12 h-12 text-violet-300">
                   <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
                   <circle cx="12" cy="13" r="4" />
                 </svg>
-              </div>
-              <div className="text-center space-y-2">
-                <p className="text-[28px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
-                <p className="text-zinc-500 text-sm leading-snug">
+              </motion.div>
+              <div className="relative text-center space-y-2">
+                <p className="text-[30px] font-black text-white leading-none tracking-tight">Scan Receipt</p>
+                <p className="text-zinc-400 text-[14px] leading-snug font-medium">
                   {isEmpty ? "Start your first investigation" : "Tap to investigate your prices"}
                 </p>
               </div>
@@ -775,75 +799,82 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
         </motion.div>
 
         {/* ③ Widget grid */}
-        <motion.div variants={staggerV} className="grid grid-cols-2 gap-3">
-          <motion.div variants={cardV} whileHover={{ scale: 1.03, transition: { duration: 0.15 } }}
-            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.18)", backdropFilter: "blur(20px)" }}>
-            <p className="text-[9px] font-bold tracking-[0.18em] text-green-500/60 uppercase">Total Saved</p>
+        <motion.div variants={staggerV} className="grid grid-cols-2 gap-4">
+          {/* Total Saved */}
+          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
+            className="aspect-square rounded-3xl p-5 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(34,197,94,0.08), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
+            <p className="text-[11px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
             <div>
-              <p className="text-[30px] font-black tabular-nums text-green-400 leading-none">
+              <p className="text-[36px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_12px_rgba(34,197,94,0.4)]">
                 <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
               </p>
-              <p className="text-[10px] text-green-500/40 mt-1 font-medium">lifetime</p>
+              <p className="text-[12px] text-green-500/50 mt-1.5 font-semibold">lifetime</p>
             </div>
           </motion.div>
 
-          <motion.div variants={cardV} whileHover={{ scale: 1.03, transition: { duration: 0.15 } }}
-            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.18)", backdropFilter: "blur(20px)" }}>
-            <p className="text-[9px] font-bold tracking-[0.18em] text-violet-500/60 uppercase">Cases Solved</p>
+          {/* Cases Solved */}
+          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
+            className="aspect-square rounded-3xl p-5 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(139,92,246,0.1), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
+            <p className="text-[11px] font-bold tracking-[0.18em] text-violet-400/70 uppercase">Cases Solved</p>
             <div>
-              <p className="text-[46px] font-black tabular-nums text-violet-400 leading-none">
+              <p className="text-[48px] font-black tabular-nums leading-none"
+                style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 <CountUpValue target={data?.receiptsScanned ?? 0} round />
               </p>
-              <p className="text-[10px] text-violet-500/40 mt-1 font-medium">receipts</p>
+              <p className="text-[12px] text-violet-500/50 mt-1.5 font-semibold">receipts</p>
             </div>
           </motion.div>
 
-          <motion.div variants={cardV} whileHover={{ scale: 1.03, transition: { duration: 0.15 } }}
+          {/* Avg Score */}
+          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
             className="aspect-square rounded-3xl flex flex-col items-center justify-center gap-2 overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(20px)" }}>
+            style={{ background: "rgba(255,255,255,0.045)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 1px rgba(139,92,246,0.18), 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07)" }}>
             <AvgScoreWidget score={data?.avgScore ?? 0} hasData={!!data && data.receiptsScanned > 0} />
           </motion.div>
 
-          <motion.div variants={cardV} whileHover={{ scale: 1.03, transition: { duration: 0.15 } }}
-            className="aspect-square rounded-3xl p-4 flex flex-col justify-between overflow-hidden"
-            style={{ background: "rgba(249,115,22,0.07)", border: "1px solid rgba(249,115,22,0.18)", backdropFilter: "blur(20px)" }}>
-            <p className="text-[9px] font-bold tracking-[0.18em] text-orange-500/60 uppercase">Streak</p>
+          {/* Streak */}
+          <motion.div variants={cardV} whileHover={{ scale: 1.04, transition: { duration: 0.15 } }}
+            className="aspect-square rounded-3xl p-5 flex flex-col justify-between overflow-hidden"
+            style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.22)", backdropFilter: "blur(20px)", boxShadow: "0 4px 24px rgba(249,115,22,0.08), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
+            <p className="text-[11px] font-bold tracking-[0.18em] text-orange-400/70 uppercase">Streak</p>
             <div>
               <div className="flex items-end gap-1.5">
-                <span className="text-[26px] leading-none">🔥</span>
-                <span className="text-[40px] font-black tabular-nums text-orange-400 leading-none">{data?.streak ?? 0}</span>
+                <span className="text-[30px] leading-none drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]">🔥</span>
+                <span className="text-[44px] font-black tabular-nums text-orange-400 leading-none drop-shadow-[0_0_12px_rgba(249,115,22,0.4)]">
+                  {data?.streak ?? 0}
+                </span>
               </div>
-              <p className="text-[10px] text-orange-500/40 mt-1 font-medium">day streak</p>
+              <p className="text-[12px] text-orange-500/50 mt-1.5 font-semibold">day streak</p>
             </div>
           </motion.div>
         </motion.div>
 
         {/* ④ Store Rankings */}
         <motion.div variants={cardV} whileHover={{ scale: 1.01, transition: { duration: 0.15 } }}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white overflow-hidden">
-            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">Store Rankings</p>
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
+            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase px-5 pt-5 pb-3">Store Rankings</p>
             {(!data || data.receiptsScanned === 0) ? (
-              <div className="px-4 pb-4 pt-1 flex items-center gap-3 opacity-40">
-                <span className="text-lg">🏆</span>
-                <span className="text-xs text-zinc-500 italic">Scan receipts to unlock store rankings</span>
+              <div className="px-5 pb-5 pt-1 flex items-center gap-3 opacity-40">
+                <span className="text-xl">🏆</span>
+                <span className="text-sm text-zinc-500 italic">Scan receipts to unlock store rankings</span>
               </div>
             ) : (
               <div className="divide-y divide-white/[0.05]">
                 {MEDALS.map((medal, i) => {
                   const store = data.storeRankings[i];
                   if (!store) return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3 opacity-40">
-                      <span className="text-lg">{medal}</span>
-                      <span className="text-xs text-zinc-600 italic">Scan more to unlock</span>
+                    <div key={i} className="flex items-center gap-3 px-5 py-3.5 opacity-40">
+                      <span className="text-xl">{medal}</span>
+                      <span className="text-sm text-zinc-600 italic">Scan more to unlock</span>
                     </div>
                   );
                   return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3">
-                      <span className="text-lg flex-shrink-0">{medal}</span>
-                      <span className="flex-1 text-sm font-bold text-white truncate">{store.name}</span>
-                      <Badge variant="outline" className={`rounded-full text-[10px] font-bold flex-shrink-0 ${scorePillClass(store.avgScore)}`}>
+                    <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                      <span className="text-xl flex-shrink-0">{medal}</span>
+                      <span className="flex-1 text-[15px] font-bold text-white truncate">{store.name}</span>
+                      <Badge variant="outline" className={`rounded-full text-[11px] font-bold flex-shrink-0 px-3 ${scorePillClass(store.avgScore)}`}>
                         {store.avgScore}
                       </Badge>
                     </div>
@@ -856,19 +887,19 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
 
         {/* ⑤ Recent Cases */}
         <motion.div variants={cardV} whileHover={{ scale: 1.01, transition: { duration: 0.15 } }}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white overflow-hidden">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">Recent Cases</p>
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">Recent Cases</p>
               {data && data.receiptsScanned > 0 && (
                 <Button variant="ghost" size="sm" onClick={onViewHistory}
-                  className="text-violet-400 hover:text-violet-300 hover:bg-transparent h-auto p-0 text-[11px] font-bold">
+                  className="text-violet-400 hover:text-violet-300 hover:bg-transparent h-auto p-0 text-[13px] font-bold">
                   View All →
                 </Button>
               )}
             </div>
             {(!data || data.recentCases.length === 0) ? (
-              <div className="px-4 pb-4 pt-1 opacity-40">
-                <p className="text-xs text-zinc-500 italic">No cases yet — scan your first receipt above</p>
+              <div className="px-5 pb-5 pt-1 opacity-40">
+                <p className="text-sm text-zinc-500 italic">No cases yet — scan your first receipt above</p>
               </div>
             ) : (
               <div className="divide-y divide-white/[0.05]">
@@ -876,23 +907,23 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
                   const analysis = scan.analyses?.[0];
                   return (
                     <motion.button key={scan.id} whileTap={{ backgroundColor: "rgba(255,255,255,0.05)" }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-5 py-4 hover:bg-white/[0.03] transition-colors text-left"
                       onClick={() => analysis && onViewResult(analysisFromDb(analysis))}>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{scan.store_name || "Unknown Store"}</p>
-                        <p className="text-xs text-zinc-600 mt-0.5">
+                        <p className="text-[15px] font-bold text-white truncate">{scan.store_name || "Unknown Store"}</p>
+                        <p className="text-[13px] text-zinc-500 mt-0.5">
                           {new Date(scan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                       </div>
                       {analysis && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
-                          <Badge variant="outline" className={`rounded-full text-[10px] font-bold ${scorePillClass(analysis.score)}`}>
+                        <div className="flex items-center gap-2.5 flex-shrink-0">
+                          <span className="text-[13px] font-bold text-green-400 tabular-nums">+${Number(analysis.total_found).toFixed(2)}</span>
+                          <Badge variant="outline" className={`rounded-full text-[11px] font-bold px-2.5 ${scorePillClass(analysis.score)}`}>
                             {analysis.score}
                           </Badge>
                         </div>
                       )}
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-700 flex-shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4 text-zinc-600 flex-shrink-0">
                         <path d="M9 18l6-6-6-6" />
                       </svg>
                     </motion.button>
@@ -905,13 +936,13 @@ function Dashboard({ data, loading, onScan, onViewHistory, onViewResult }: {
 
         {/* ⑥ Smart Insight */}
         <motion.div variants={cardV} whileHover={{ scale: 1.01, transition: { duration: 0.15 } }}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white p-4 flex gap-3 items-start">
-            <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0 text-base leading-none">
+          <Card className="rounded-2xl shadow-none text-white p-5 flex gap-4 items-start" style={GLASS}>
+            <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 text-lg leading-none">
               💡
             </div>
             <div>
-              <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Smart Insight</p>
-              <p className="text-sm text-zinc-300 leading-relaxed">
+              <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase mb-2">Smart Insight</p>
+              <p className="text-[14px] text-zinc-300 leading-relaxed">
                 {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
               </p>
             </div>
@@ -957,32 +988,32 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
     <div className="flex-1 overflow-y-auto">
       <motion.div className="px-5 pt-3 pb-6 space-y-3 max-w-sm mx-auto"
         variants={staggerV} initial="hidden" animate="show">
-        <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase">All Cases · {scans.length}</p>
+        <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">All Cases · {scans.length}</p>
         {scans.map((scan) => {
           const analysis = scan.analyses?.[0];
           return (
             <motion.div key={scan.id} variants={cardV} whileHover={{ scale: 1.015, transition: { duration: 0.15 } }}>
-              <Card className="bg-white/[0.04] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white overflow-hidden">
-                <button className="w-full p-4 text-left hover:bg-white/[0.03] transition-colors"
+              <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
+                <button className="w-full p-5 text-left hover:bg-white/[0.03] transition-colors"
                   onClick={() => analysis && onViewResult(analysisFromDb(analysis))}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-bold text-white text-sm truncate">{scan.store_name || "Unknown Store"}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="font-bold text-white text-[15px] truncate">{scan.store_name || "Unknown Store"}</p>
+                      <p className="text-[13px] text-zinc-500 mt-0.5">
                         {new Date(scan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
                     </div>
                     {analysis && (
                       <div className="text-right flex-shrink-0">
-                        <p className={`text-xl font-black tabular-nums leading-none ${scorePillClass(analysis.score).split(" ")[0]}`}>{analysis.score}</p>
-                        <p className="text-[10px] text-zinc-600">/100</p>
+                        <p className={`text-2xl font-black tabular-nums leading-none ${scorePillClass(analysis.score).split(" ")[0]}`}>{analysis.score}</p>
+                        <p className="text-[11px] text-zinc-600">/100</p>
                       </div>
                     )}
                   </div>
                   {analysis && (
                     <div className="flex justify-between mt-3 pt-3 border-t border-white/[0.06]">
-                      <span className="text-xs text-zinc-500">Savings found</span>
-                      <span className="text-xs font-bold text-violet-400 tabular-nums">${Number(analysis.total_found).toFixed(2)}</span>
+                      <span className="text-[13px] text-zinc-500">Savings found</span>
+                      <span className="text-[13px] font-bold text-violet-400 tabular-nums">${Number(analysis.total_found).toFixed(2)}</span>
                     </div>
                   )}
                 </button>
@@ -1016,26 +1047,26 @@ function SettingsTab() {
       <motion.div className="px-5 pt-3 pb-6 space-y-4 max-w-sm mx-auto"
         variants={staggerV} initial="hidden" animate="show">
         <motion.div variants={cardV}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]">
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]" style={GLASS}>
             <ToggleRow label="Notifications" value={notif} onChange={setNotif} />
             <ToggleRow label="Dark Mode"     value={dark}  onChange={setDark}  />
           </Card>
         </motion.div>
         <motion.div variants={cardV}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]">
-            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase px-4 pt-4 pb-2">About</p>
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]" style={GLASS}>
+            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase px-5 pt-5 pb-3">About</p>
             {[["App", "Receipt Detective"], ["Version", "1.0.0"], ["Powered by", "Claude AI"]].map(([label, value]) => (
-              <div key={label} className="flex justify-between items-center px-4 py-3.5">
-                <span className="text-sm text-zinc-500">{label}</span>
-                <span className="text-sm font-bold text-zinc-300">{value}</span>
+              <div key={label} className="flex justify-between items-center px-5 py-4">
+                <span className="text-[14px] text-zinc-500">{label}</span>
+                <span className="text-[14px] font-bold text-zinc-300">{value}</span>
               </div>
             ))}
           </Card>
         </motion.div>
         <motion.div variants={cardV}>
-          <Card className="bg-white/[0.05] backdrop-blur-xl border-white/10 rounded-2xl shadow-none text-white p-4">
-            <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-2">Legal</p>
-            <p className="text-xs text-zinc-600 leading-relaxed">Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.</p>
+          <Card className="rounded-2xl shadow-none text-white p-5" style={GLASS}>
+            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase mb-3">Legal</p>
+            <p className="text-[13px] text-zinc-600 leading-relaxed">Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.</p>
           </Card>
         </motion.div>
       </motion.div>
@@ -1126,13 +1157,14 @@ export default function Home() {
   return (
     <div className="min-h-screen text-white font-sans flex flex-col" style={NAVY}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/[0.06] rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-indigo-600/[0.04] rounded-full blur-[90px]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-600/[0.09] rounded-full blur-[140px]" />
+        <div className="absolute top-1/3 right-0 w-80 h-80 bg-purple-600/[0.06] rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-indigo-600/[0.05] rounded-full blur-[90px]" />
       </div>
 
-      <div className="relative z-10 px-5 pt-12 pb-3 flex-shrink-0 border-b border-white/[0.05]">
-        <h1 className="text-[22px] font-black tracking-tight leading-none">RECEIPT DETECTIVE</h1>
-        <p className="text-zinc-600 text-xs mt-1 font-medium">{tabSubtitle[activeTab]}</p>
+      <div className="relative z-10 px-5 pt-12 pb-4 flex-shrink-0 border-b border-white/[0.06]">
+        <h1 className="text-[28px] font-black tracking-tight leading-none">RECEIPT DETECTIVE</h1>
+        <p className="text-zinc-500 text-[13px] mt-1.5 font-medium">{tabSubtitle[activeTab]}</p>
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
