@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import AnalyticsTab from "@/components/AnalyticsTab";
 import ShoppingTab from "@/components/ShoppingTab";
 import RewardsTab from "@/components/RewardsTab";
+import PlaidBankSection from "@/components/PlaidLinkButton";
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const cardV = {
@@ -1481,20 +1482,11 @@ function SettingsTab({ onLogout }: { onLogout: () => void }) {
           </Card>
         </motion.div>
 
-        {/* Bank Linking (Plaid — needs API keys) */}
+        {/* Bank Linking (Plaid) */}
         <motion.div variants={cardV}>
           <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
-            <div className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase flex-1">Bank Accounts</p>
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/25">SOON</span>
-              </div>
-              <p className="text-[12px] text-zinc-600 leading-snug">Link your bank account to auto-match transactions with scanned receipts and unlock spending insights.</p>
-              <button disabled
-                className="w-full py-3 rounded-xl font-bold text-[11px] tracking-widest uppercase text-zinc-600 cursor-not-allowed"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                🏦 Link Your Bank (Plaid)
-              </button>
+            <div className="p-4">
+              <PlaidBankSection />
             </div>
           </Card>
         </motion.div>

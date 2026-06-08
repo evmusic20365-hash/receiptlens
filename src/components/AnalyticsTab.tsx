@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,11 @@ interface AnalysisCategory { emoji: string; name: string; rating: "green" | "yel
 interface DbAnalysis { score: number; leaks: AnalysisCategory[]; total_found: number; }
 interface DbReceipt { id: string; created_at: string; store_name: string | null; total: number | null; analyses: DbAnalysis[]; }
 interface PriceHistoryRow { item_name: string; price: number; store: string | null; category: string | null; scanned_at: string; }
+interface BankTransaction {
+  id: string; amount: number; merchant: string | null; normalized_category: string | null;
+  date: string; pending: boolean; matched_receipt_id: string | null;
+  linked_accounts: { bank_name: string; mask: string | null; account_type: string } | null;
+}
 
 // ── Category normalization ────────────────────────────────────────────────────
 function normalizeCat(name: string): string {
@@ -137,6 +142,47 @@ export default function AnalyticsTab() {
   const [receipts, setReceipts] = useState<DbReceipt[]>([]);
   const [history,  setHistory]  = useState<PriceHistoryRow[]>([]);
   const [loading,  setLoading]  = useState(true);
+
+  // Sub-tab
+  const [subTab, setSubTab] = useState<"overview" | "transactions">("overview");
+
+  // Transactions sub-tab state
+  const [txns,        setTxns]        = useState<BankTransaction[]>([]);
+  const [txnsLoading, setTxnsLoading] = useState(false);
+  const [txnSearch,   setTxnSearch]   = useState("");
+  const [txnCat,      setTxnCat]      = useState("");
+  const [txnOffset,   setTxnOffset]   = useState(0);
+  const [txnHasMore,  setTxnHasMore]  = useState(false);
+  const TXN_LIMIT = 40;
+
+  const fetchTxns = useCallback(async (reset = false) => {
+    setTxnsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setTxnsLoading(false); return; }
+      const offset = reset ? 0 : txnOffset;
+      const params = new URLSearchParams({ limit: String(TXN_LIMIT), offset: String(offset) });
+      if (txnSearch) params.set("q", txnSearch);
+      if (txnCat)    params.set("category", txnCat);
+      const res  = await fetch(`/api/plaid/transactions?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const rows = (data.transactions ?? []) as BankTransaction[];
+      if (reset) { setTxns(rows); setTxnOffset(TXN_LIMIT); }
+      else       { setTxns(prev => [...prev, ...rows]); setTxnOffset(offset + TXN_LIMIT); }
+      setTxnHasMore(rows.length === TXN_LIMIT);
+    } catch { /* ignore */ } finally { setTxnsLoading(false); }
+  }, [txnSearch, txnCat, txnOffset]);
+
+  // Load transactions when switching to sub-tab
+  useEffect(() => {
+    if (subTab === "transactions" && txns.length === 0) fetchTxns(true);
+  }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch when search/filter changes
+  useEffect(() => {
+    if (subTab === "transactions") fetchTxns(true);
+  }, [txnSearch, txnCat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     Promise.all([
@@ -300,11 +346,93 @@ export default function AnalyticsTab() {
       <motion.div className="px-4 pt-3 pb-24 space-y-4 max-w-sm mx-auto"
         variants={staggerV} initial="hidden" animate="show">
 
-        {/* Header */}
+        {/* Header + sub-tab switcher */}
         <motion.div variants={cardV}>
           <p className="text-[10px] font-bold tracking-[0.28em] text-zinc-500 uppercase">Intelligence Report</p>
-          <p className="text-xl font-black text-white">Spending Analytics</p>
+          <p className="text-xl font-black text-white mb-3">Spending Analytics</p>
+          <div className="flex gap-1.5">
+            {(["overview", "transactions"] as const).map(t => (
+              <button key={t} onClick={() => setSubTab(t)}
+                className="flex-1 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all"
+                style={subTab === t
+                  ? { background: "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "#fff", boxShadow: "0 2px 12px rgba(124,58,237,0.35)" }
+                  : { background: "rgba(255,255,255,0.04)", color: "#71717a", border: "1px solid rgba(255,255,255,0.07)" }}>
+                {t === "overview" ? "Overview" : "Transactions"}
+              </button>
+            ))}
+          </div>
         </motion.div>
+
+        {/* ── Transactions sub-tab ── */}
+        {subTab === "transactions" && (
+          <>
+            {/* Search + filter */}
+            <motion.div variants={cardV} className="flex gap-2">
+              <input value={txnSearch} onChange={e => setTxnSearch(e.target.value)} placeholder="Search merchant…"
+                className="flex-1 rounded-xl px-3 py-2 text-[12px] text-white placeholder-zinc-700 outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }} />
+              <select value={txnCat} onChange={e => setTxnCat(e.target.value)}
+                className="rounded-xl px-2 py-2 text-[11px] text-zinc-400 outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <option value="">All</option>
+                {["Groceries","Beauty","Household","Clothing","Electronics","Dining","Pet","Health","Other"].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </motion.div>
+
+            {txnsLoading && txns.length === 0 ? (
+              <motion.div variants={cardV} className="flex justify-center py-8">
+                <div className="w-6 h-6 border-2 border-white/10 border-t-violet-500 rounded-full animate-spin" />
+              </motion.div>
+            ) : txns.length === 0 ? (
+              <motion.div variants={cardV} className="text-center py-10 space-y-2">
+                <p className="text-3xl">🏦</p>
+                <p className="text-zinc-500 text-[13px] font-bold">No transactions yet.</p>
+                <p className="text-zinc-700 text-[12px]">Link your bank in Settings to import transactions.</p>
+              </motion.div>
+            ) : (
+              <>
+                {txns.map(txn => {
+                  const catMeta = CAT_META[txn.normalized_category ?? "Other"] ?? CAT_META.Other;
+                  const isMatched = !!txn.matched_receipt_id;
+                  return (
+                    <motion.div key={txn.id} variants={cardV}>
+                      <div className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="text-xl flex-shrink-0">{catMeta.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-bold text-white truncate">{txn.merchant || "Unknown"}</p>
+                          <p className="text-[10px] text-zinc-700">
+                            {new Date(txn.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {txn.pending && " · Pending"}
+                            {txn.linked_accounts && <> · ••••{txn.linked_accounts.mask ?? "?"}</>}
+                            {isMatched && <span className="text-green-600"> · ✓ Receipt</span>}
+                          </p>
+                        </div>
+                        <span className={`text-[13px] font-black flex-shrink-0 ${txn.amount > 0 ? "text-red-400" : "text-green-400"}`}>
+                          {txn.amount > 0 ? "-" : "+"}${Math.abs(txn.amount).toFixed(2)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+                {txnHasMore && (
+                  <motion.div variants={cardV}>
+                    <button onClick={() => fetchTxns(false)} disabled={txnsLoading}
+                      className="w-full py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider text-violet-400 disabled:opacity-50"
+                      style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}>
+                      {txnsLoading ? "Loading…" : "Load more"}
+                    </button>
+                  </motion.div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Overview sub-tab (all existing cards) ── */}
+        {subTab === "overview" && (<>
 
         {/* Spending pie chart */}
         {pieSegments.length > 0 && (
@@ -448,6 +576,8 @@ export default function AnalyticsTab() {
             </div>
           </motion.div>
         )}
+
+        </>)}
 
       </motion.div>
     </div>
