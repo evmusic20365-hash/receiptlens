@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - paragraph [ref=e5]: Receipt Detective
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Welcome back, Detective." [level=1] [ref=e8]:
+          - text: Welcome back,
+          - text: Detective.
+        - paragraph [ref=e9]: The case files await.
+      - generic [ref=e10]:
+        - textbox "Email address" [ref=e11]
+        - textbox "Password" [ref=e12]
+        - button "Sign In" [ref=e13]
+    - paragraph [ref=e14]:
+      - text: No case file yet?
+      - link "Open a new one." [ref=e15] [cursor=pointer]:
+        - /url: /signup
+  - button "Open Next.js Dev Tools" [ref=e21] [cursor=pointer]:
+    - img [ref=e22]
+  - alert [ref=e25]

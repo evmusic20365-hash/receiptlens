@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "RECEIPT DETECTIVE" [level=1] [ref=e13]
+      - paragraph [ref=e14]: Your price intelligence agency
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e20]: Hey Detective
+        - button "SCAN NOW Tap to investigate prices" [ref=e24]:
+          - img [ref=e26]
+          - generic [ref=e29]:
+            - paragraph [ref=e30]: SCAN NOW
+            - paragraph [ref=e31]: Tap to investigate prices
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - paragraph [ref=e34]: Total Saved
+            - generic [ref=e35]:
+              - paragraph [ref=e36]:
+                - generic [ref=e37]: $0.00
+              - paragraph [ref=e38]: lifetime
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: Cases Solved
+            - generic [ref=e41]:
+              - paragraph [ref=e42]: "0"
+              - paragraph [ref=e43]: receipts
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - generic [ref=e50]: —
+            - paragraph [ref=e51]: Avg Score
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: Streak
+            - generic [ref=e54]:
+              - generic [ref=e55]:
+                - generic [ref=e56]: 🔥
+                - generic [ref=e57]: "0"
+              - paragraph [ref=e58]: day streak
+      - generic [ref=e59]:
+        - generic [ref=e61]:
+          - generic [ref=e63]:
+            - paragraph [ref=e64]: Store Rankings
+            - generic [ref=e65]:
+              - generic [ref=e66]: 🏆
+              - generic [ref=e67]: Scan receipts to unlock store rankings
+          - generic [ref=e69]:
+            - paragraph [ref=e71]: Recent Cases
+            - paragraph [ref=e73]: No cases yet — scan your first receipt above
+          - generic [ref=e75]:
+            - generic [ref=e76]: 💡
+            - generic [ref=e77]:
+              - paragraph [ref=e78]: Smart Insight
+              - paragraph [ref=e79]: Scan 3+ receipts to unlock personalized insights.
+        - generic [ref=e80]:
+          - button
+          - button
+          - button
+    - generic [ref=e82]:
+      - button "HOME" [ref=e83]:
+        - img [ref=e84]
+        - text: HOME
+      - button "HISTORY" [ref=e87]:
+        - img [ref=e88]
+        - text: HISTORY
+      - button "SETTINGS" [ref=e91]:
+        - img [ref=e92]
+        - text: SETTINGS

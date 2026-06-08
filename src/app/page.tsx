@@ -10,6 +10,9 @@ import MascotLottie from "@/components/MascotLottie";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import AnalyticsTab from "@/components/AnalyticsTab";
+import ShoppingTab from "@/components/ShoppingTab";
+import RewardsTab from "@/components/RewardsTab";
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const cardV = {
@@ -63,11 +66,14 @@ interface HistoryScan {
   receipt_date: string | null; total: number | null; analyses: DbAnalysis[];
 }
 interface StoreRanking { name: string; avgScore: number; count: number; }
+interface OverpricedAlert { item: string; paid: number; cheaperPrice: number; cheaperStore: string; savings: number; }
 interface DashboardData {
   avgScore: number; totalSavings: number; receiptsScanned: number;
+  thisWeekSavings: number; thisMonthSavings: number;
   recentCases: HistoryScan[]; storeRankings: StoreRanking[]; streak: number; insight: string;
+  overpricedAlert: OverpricedAlert | null;
 }
-type NavTab = "home" | "history" | "settings";
+type NavTab = "home" | "analytics" | "shopping" | "rewards" | "history" | "settings";
 
 // ── Fallback ──────────────────────────────────────────────────────────────────
 const FALLBACK: AnalysisResult = {
@@ -194,6 +200,20 @@ function useDashboardData(refreshKey: number) {
         const totalSavings   = Number(allAnalyses.reduce((s, a) => s + (a.total_found ?? 0), 0).toFixed(2));
         const avgScore       = allAnalyses.length
           ? Math.round(allAnalyses.reduce((s, a) => s + (a.score ?? 0), 0) / allAnalyses.length) : 0;
+
+        // Weekly / monthly savings
+        const now = Date.now();
+        const MS_DAY = 86_400_000;
+        const weekStart  = now - 7  * MS_DAY;
+        const monthStart = now - 30 * MS_DAY;
+        let thisWeekSavings = 0, thisMonthSavings = 0;
+        for (const scan of scans) {
+          const t = new Date(scan.created_at).getTime();
+          const s = (scan.analyses?.[0]?.total_found ?? 0);
+          if (t >= weekStart)  thisWeekSavings  += s;
+          if (t >= monthStart) thisMonthSavings += s;
+        }
+
         const storeMap: Record<string, number[]> = {};
         for (const scan of scans) {
           const name  = scan.store_name?.trim();
@@ -205,7 +225,26 @@ function useDashboardData(refreshKey: number) {
           .sort((a, b) => b.avgScore - a.avgScore).slice(0, 3);
         const streak  = computeStreak(scans);
         const insight = computeInsight(scans, storeRankings);
-        setData({ avgScore, totalSavings, receiptsScanned: scans.length, recentCases: scans.slice(0, 3), storeRankings, streak, insight });
+
+        // Overpriced alert: worst item from most recent scan
+        let overpricedAlert: OverpricedAlert | null = null;
+        const latestAnalysis = scans[0]?.analyses?.[0];
+        if (latestAnalysis) {
+          let worst: OverpricedAlert | null = null;
+          for (const cat of (latestAnalysis.leaks ?? []) as Category[]) {
+            for (const item of cat.items) {
+              if (item.cheaperStore && item.cheaperPrice != null) {
+                const savings = Math.max(0, item.paid - item.cheaperPrice);
+                if (!worst || savings > worst.savings) {
+                  worst = { item: item.name, paid: item.paid, cheaperPrice: item.cheaperPrice, cheaperStore: item.cheaperStore, savings };
+                }
+              }
+            }
+          }
+          overpricedAlert = worst;
+        }
+
+        setData({ avgScore, totalSavings, thisWeekSavings: +thisWeekSavings.toFixed(2), thisMonthSavings: +thisMonthSavings.toFixed(2), receiptsScanned: scans.length, recentCases: scans.slice(0, 3), storeRankings, streak, insight, overpricedAlert });
         setLoading(false);
       });
   }, [refreshKey]);
@@ -215,17 +254,33 @@ function useDashboardData(refreshKey: number) {
 // ── DB ────────────────────────────────────────────────────────────────────────
 async function saveScanToDb(receipt: ExtractedReceipt | null, analysis: AnalysisResult, imageBase64?: string) {
   console.log("[saveScanToDb] starting — store:", receipt?.storeName, "| score:", analysis.score, "| savings:", analysis.totalSavings);
-  console.log("[saveScanToDb] Supabase URL defined:", !!process.env.NEXT_PUBLIC_SUPABASE_URL, "| Key defined:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const receiptRow = { store_name: receipt?.storeName ?? null, receipt_date: receipt?.date ?? null, items: receipt?.items ?? null, total: receipt?.total ?? null, image_base64: imageBase64 ?? null };
-  console.log("[saveScanToDb] inserting receipt row:", { ...receiptRow, image_base64: receiptRow.image_base64 ? "(truncated)" : null });
   const { data, error } = await supabase.from("receipts").insert(receiptRow).select("id").single();
-  if (error) { console.error("[saveScanToDb] receipts INSERT failed:", error.message, "| code:", error.code, "| details:", error.details, "| hint:", error.hint); throw error; }
-  console.log("[saveScanToDb] receipt saved, id:", data.id);
+  if (error) { console.error("[saveScanToDb] receipts INSERT failed:", error.message); throw error; }
+
   const analysisRow = { receipt_id: data.id, leaks: analysis.categories, total_found: analysis.totalSavings, yearly_potential: analysis.yearlySavings, score: analysis.score };
-  console.log("[saveScanToDb] inserting analysis row:", { ...analysisRow, leaks: `[${analysisRow.leaks.length} categories]` });
   const { error: aErr } = await supabase.from("analyses").insert(analysisRow);
-  if (aErr) { console.error("[saveScanToDb] analyses INSERT failed:", aErr.message, "| code:", aErr.code, "| details:", aErr.details, "| hint:", aErr.hint); throw aErr; }
-  console.log("[saveScanToDb] analysis saved successfully ✓");
+  if (aErr) { console.error("[saveScanToDb] analyses INSERT failed:", aErr.message); throw aErr; }
+
+  // Save price_history (best-effort — don't block on failure)
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      const rows = analysis.categories.flatMap(cat =>
+        cat.items.map(item => ({
+          user_id:    user.id,
+          receipt_id: data.id,
+          item_name:  item.name,
+          price:      item.paid,
+          store:      receipt?.storeName ?? null,
+          category:   cat.name,
+        }))
+      );
+      if (rows.length) await supabase.from("price_history").insert(rows);
+    }
+  } catch (e) { console.warn("[saveScanToDb] price_history save skipped:", e); }
+
+  console.log("[saveScanToDb] saved successfully ✓");
 }
 
 
@@ -270,24 +325,41 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
     {
       key: "home", label: "Home",
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9,22 9,12 15,12 15,22" />
         </svg>
       ),
     },
     {
-      key: "history", label: "History",
+      key: "analytics", label: "Intel",
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14,2 14,8 20,8" />
-          <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+          <line x1="2" y1="20" x2="22" y2="20"/>
         </svg>
       ),
     },
     {
-      key: "settings", label: "Settings",
+      key: "shopping", label: "Shop",
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M16 10a4 4 0 01-8 0"/>
+        </svg>
+      ),
+    },
+    {
+      key: "rewards", label: "Awards",
+      icon: (
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+        </svg>
+      ),
+    },
+    {
+      key: "settings", label: "More",
+      icon: (
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3" />
           <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
         </svg>
@@ -295,14 +367,14 @@ function BottomNav({ active, onTabChange }: { active: NavTab; onTabChange: (t: N
     },
   ];
   return (
-    <div className="border-t border-white/[0.06] grid grid-cols-3 flex-shrink-0"
-         style={{ background: "rgba(10,14,26,0.88)", backdropFilter: "blur(20px)" }}>
+    <div className="border-t border-white/[0.06] grid grid-cols-5 flex-shrink-0"
+         style={{ background: "rgba(10,14,26,0.92)", backdropFilter: "blur(20px)" }}>
       {tabs.map((tab) => {
         const isActive = tab.key === active;
         return (
-          <motion.button key={tab.key} onClick={() => onTabChange(tab.key)} whileTap={{ scale: 0.85 }}
-            className={`py-3 flex flex-col items-center gap-1 text-[10px] font-semibold tracking-wide transition-colors
-              ${isActive ? "text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.6)]" : "text-zinc-600 hover:text-zinc-400"}`}>
+          <motion.button key={tab.key} onClick={() => onTabChange(tab.key)} whileTap={{ scale: 0.82 }}
+            className={`py-2.5 flex flex-col items-center gap-0.5 text-[8.5px] font-bold tracking-wide transition-colors
+              ${isActive ? "text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.6)]" : "text-zinc-600"}`}>
             {tab.icon}
             {tab.label.toUpperCase()}
           </motion.button>
@@ -1014,6 +1086,103 @@ const QUICK_TIPS = [
   "Buy in bulk only what you'll finish. Waste is the enemy of savings.",
 ] as const;
 
+// ── Dashboard bottom carousel ─────────────────────────────────────────────────
+function DashboardCarousel({ data, tip }: { data: DashboardData | null; tip: string }) {
+  const [page, setPage] = useState(0);
+  const PAGES = 3;
+
+  const slides = [
+    // Slide 0: Store Rankings
+    <div key="rankings" className="px-0.5">
+      <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Store Rankings</p>
+      {data?.storeRankings.length ? (
+        <div className="space-y-1.5">
+          {data.storeRankings.slice(0, 2).map((s, i) => {
+            const color = s.avgScore >= 75 ? "#22c55e" : s.avgScore >= 55 ? "#f59e0b" : "#ef4444";
+            return (
+              <div key={s.name} className="flex items-center gap-2">
+                <span className="text-xs">{i === 0 ? "🥇" : "🥈"}</span>
+                <span className="text-[11px] text-zinc-300 flex-1 truncate font-medium">{s.name}</span>
+                <span className="text-[11px] font-black tabular-nums" style={{ color }}>{s.avgScore}/100</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[11px] text-zinc-700">Scan from 2+ stores to compare.</p>
+      )}
+    </div>,
+
+    // Slide 1: Recent Cases
+    <div key="recent" className="px-0.5">
+      <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Recent Cases</p>
+      {data?.recentCases.length ? (
+        <div className="space-y-1.5">
+          {data.recentCases.slice(0, 2).map(scan => {
+            const a = scan.analyses?.[0];
+            return (
+              <div key={scan.id} className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-zinc-300 truncate">{scan.store_name || "Unknown"}</p>
+                  <p className="text-[9px] text-zinc-700">{new Date(scan.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</p>
+                </div>
+                {a && <span className={`text-[12px] font-black tabular-nums ${a.score >= 75 ? "text-green-400" : a.score >= 55 ? "text-amber-400" : "text-red-400"}`}>{a.score}</span>}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[11px] text-zinc-700">No cases solved yet.</p>
+      )}
+    </div>,
+
+    // Slide 2: Smart Insight
+    <div key="insight" className="px-0.5">
+      <p className="text-[9px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-1.5">Smart Insight</p>
+      <p className="text-[11px] text-zinc-300 leading-snug line-clamp-3">
+        💡 {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
+      </p>
+    </div>,
+  ];
+
+  return (
+    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
+      className="flex-shrink-0 rounded-xl overflow-hidden"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(139,92,246,0.15)", backdropFilter: "blur(20px)" }}>
+      <div className="px-3 pt-2.5 pb-2 overflow-hidden">
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.15}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -40) setPage(p => Math.min(p + 1, PAGES - 1));
+            if (info.offset.x >  40) setPage(p => Math.max(p - 1, 0));
+          }}
+          className="cursor-grab active:cursor-grabbing"
+        >
+          <AnimatePresence mode="wait">
+            <motion.div key={page}
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.18 }}>
+              {slides[page]}
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </div>
+      {/* Dot indicators */}
+      <div className="flex justify-center gap-1.5 pb-2.5">
+        {Array.from({ length: PAGES }).map((_, i) => (
+          <motion.div key={i}
+            animate={{ width: i === page ? 14 : 5, background: i === page ? "#a855f7" : "rgba(255,255,255,0.18)" }}
+            className="h-[5px] rounded-full cursor-pointer"
+            onClick={() => setPage(i)}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 // ── Dashboard (Home tab) ──────────────────────────────────────────────────────
 function Dashboard({ data, loading, onScan }: {
   data: DashboardData | null; loading: boolean;
@@ -1116,7 +1285,9 @@ function Dashboard({ data, loading, onScan }: {
         <motion.div variants={cardV}
           className="rounded-2xl p-2.5 flex flex-col justify-between overflow-hidden"
           style={{ height: "min(9vh, 76px)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", backdropFilter: "blur(20px)" }}>
-          <p className="text-[8px] font-bold tracking-[0.18em] text-green-400/70 uppercase">Total Saved</p>
+          <p className="text-[8px] font-bold tracking-[0.18em] text-green-400/70 uppercase">
+            Saved {data?.thisMonthSavings ? `· $${data.thisMonthSavings.toFixed(0)} this mo` : "Lifetime"}
+          </p>
           <p className="text-[22px] font-black tabular-nums text-green-400 leading-none drop-shadow-[0_0_10px_rgba(34,197,94,0.4)]">
             <CountUpValue target={data?.totalSavings ?? 0} prefix="$" />
           </p>
@@ -1157,22 +1328,23 @@ function Dashboard({ data, loading, onScan }: {
 
       </motion.div>
 
-      {/* ④ Smart Insight */}
-      <motion.div variants={cardV}
-        className="flex-shrink-0 rounded-xl px-3 py-2.5 flex gap-2.5 items-center" style={GLASS}>
-        <span className="text-[15px] leading-none flex-shrink-0">💡</span>
-        <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2">
-          {data?.insight ?? "Scan 3+ receipts to unlock personalized insights."}
-        </p>
-      </motion.div>
+      {/* ④ Overpriced Alert */}
+      {data?.overpricedAlert && (
+        <motion.div variants={cardV} className="flex-shrink-0 rounded-xl px-3 py-2.5 flex gap-2.5 items-center"
+          style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", backdropFilter: "blur(20px)" }}>
+          <span className="text-base leading-none flex-shrink-0">🚨</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Overpaid Alert</p>
+            <p className="text-[11px] text-zinc-300 leading-snug truncate">
+              <span className="font-bold">{data.overpricedAlert.item}</span> — ${data.overpricedAlert.savings.toFixed(2)} cheaper at {data.overpricedAlert.cheaperStore}
+            </p>
+          </div>
+          <p className="text-[13px] font-black text-red-400 flex-shrink-0">-${data.overpricedAlert.savings.toFixed(2)}</p>
+        </motion.div>
+      )}
 
-      {/* ⑤ Quick Tip */}
-      <motion.div variants={cardV}
-        className="flex-shrink-0 rounded-xl px-3 py-2.5 flex gap-2.5 items-center"
-        style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.18)", backdropFilter: "blur(20px)" }}>
-        <span className="text-[15px] leading-none flex-shrink-0">🕵️</span>
-        <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2">{tip}</p>
-      </motion.div>
+      {/* ⑤ Swipeable carousel: Store Rankings · Recent Cases · Insight */}
+      <DashboardCarousel data={data} tip={tip} />
 
     </motion.div>
   );
@@ -1270,20 +1442,119 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 function SettingsTab({ onLogout }: { onLogout: () => void }) {
   const [notif, setNotif] = useState(true);
   const [dark,  setDark]  = useState(true);
+  const [loyaltyCards, setLoyaltyCards] = useState<Array<{ id: string; store_name: string; card_number: string }>>([]);
+  const [addingCard,   setAddingCard]   = useState(false);
+  const [cardStore,    setCardStore]    = useState("");
+  const [cardNum,      setCardNum]      = useState("");
+
+  useEffect(() => {
+    supabase.from("loyalty_cards").select("id, store_name, card_number").then(({ data }) => {
+      if (data) setLoyaltyCards(data as typeof loyaltyCards);
+    });
+  }, []);
+
+  const addLoyaltyCard = async () => {
+    if (!cardStore.trim() || !cardNum.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from("loyalty_cards")
+      .insert({ user_id: user.id, store_name: cardStore.trim(), card_number: cardNum.trim() })
+      .select().single();
+    if (data) setLoyaltyCards(prev => [...prev, data as typeof loyaltyCards[0]]);
+    setCardStore(""); setCardNum(""); setAddingCard(false);
+  };
+
+  const removeLoyaltyCard = async (id: string) => {
+    await supabase.from("loyalty_cards").delete().eq("id", id);
+    setLoyaltyCards(prev => prev.filter(c => c.id !== id));
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <motion.div className="px-5 pt-3 pb-6 space-y-4 max-w-sm mx-auto"
         variants={staggerV} initial="hidden" animate="show">
+
         <motion.div variants={cardV}>
           <Card className="rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]" style={GLASS}>
             <ToggleRow label="Notifications" value={notif} onChange={setNotif} />
             <ToggleRow label="Dark Mode"     value={dark}  onChange={setDark}  />
           </Card>
         </motion.div>
+
+        {/* Bank Linking (Plaid — needs API keys) */}
+        <motion.div variants={cardV}>
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase flex-1">Bank Accounts</p>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/25">SOON</span>
+              </div>
+              <p className="text-[12px] text-zinc-600 leading-snug">Link your bank account to auto-match transactions with scanned receipts and unlock spending insights.</p>
+              <button disabled
+                className="w-full py-3 rounded-xl font-bold text-[11px] tracking-widest uppercase text-zinc-600 cursor-not-allowed"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                🏦 Link Your Bank (Plaid)
+              </button>
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Loyalty Cards */}
+        <motion.div variants={cardV}>
+          <Card className="rounded-2xl shadow-none text-white overflow-hidden" style={GLASS}>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">Loyalty Cards</p>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setAddingCard(v => !v)}
+                  className="text-[10px] font-bold text-violet-400 uppercase tracking-wider px-2 py-1 rounded-lg"
+                  style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.2)" }}>
+                  {addingCard ? "Cancel" : "+ Add"}
+                </motion.button>
+              </div>
+              <AnimatePresence>
+                {addingCard && (
+                  <motion.div key="lc-form"
+                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                    <div className="space-y-2">
+                      <input value={cardStore} onChange={e => setCardStore(e.target.value)} placeholder="Store (CVS, Safeway…)"
+                        className="w-full rounded-xl px-3 py-2.5 text-[12px] text-white placeholder-zinc-600 outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                      <input value={cardNum} onChange={e => setCardNum(e.target.value)} placeholder="Card number"
+                        className="w-full rounded-xl px-3 py-2.5 text-[12px] text-white placeholder-zinc-600 outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                      <motion.button whileTap={{ scale: 0.97 }} onClick={addLoyaltyCard}
+                        className="w-full py-2.5 rounded-xl font-bold text-[11px] tracking-widest uppercase text-white"
+                        style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)" }}>
+                        Save Card
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              {loyaltyCards.length === 0 && !addingCard && (
+                <p className="text-[12px] text-zinc-700">No loyalty cards saved yet.</p>
+              )}
+              {loyaltyCards.map(card => (
+                <div key={card.id} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-zinc-300">{card.store_name}</p>
+                    <p className="text-[10px] text-zinc-700 font-mono">••••{card.card_number.slice(-4)}</p>
+                  </div>
+                  <button onClick={() => removeLoyaltyCard(card.id)} className="text-zinc-700 hover:text-red-400 transition-colors p-1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-4 h-4">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+
         <motion.div variants={cardV}>
           <Card className="rounded-2xl shadow-none text-white overflow-hidden divide-y divide-white/[0.06]" style={GLASS}>
             <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase px-5 pt-5 pb-3">About</p>
-            {[["App", "Receipt Detective"], ["Version", "1.0.0"], ["Powered by", "Claude AI"]].map(([label, value]) => (
+            {[["App", "Receipt Detective"], ["Version", "2.0.0"], ["Powered by", "Claude AI"]].map(([label, value]) => (
               <div key={label} className="flex justify-between items-center px-5 py-4">
                 <span className="text-[14px] text-zinc-500">{label}</span>
                 <span className="text-[14px] font-bold text-zinc-300">{value}</span>
@@ -1291,19 +1562,18 @@ function SettingsTab({ onLogout }: { onLogout: () => void }) {
             ))}
           </Card>
         </motion.div>
+
         <motion.div variants={cardV}>
           <Card className="rounded-2xl shadow-none text-white p-5" style={GLASS}>
             <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase mb-3">Legal</p>
             <p className="text-[13px] text-zinc-600 leading-relaxed">Price comparisons are estimates only. Receipt Detective is not affiliated with any retailers. Always verify prices before purchasing.</p>
           </Card>
         </motion.div>
+
         <motion.div variants={cardV}>
-          <motion.button
-            onClick={onLogout}
-            whileTap={{ scale: 0.97 }}
+          <motion.button onClick={onLogout} whileTap={{ scale: 0.97 }}
             className="w-full py-4 rounded-2xl font-black text-[13px] tracking-widest uppercase text-red-400"
-            style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)", backdropFilter: "blur(20px)" }}
-          >
+            style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)", backdropFilter: "blur(20px)" }}>
             Sign Out
           </motion.button>
         </motion.div>
@@ -1584,9 +1854,12 @@ export default function Home() {
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex-1 flex flex-col overflow-hidden">
-            {activeTab === "home"     && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} />}
-            {activeTab === "history"  && <HistoryTab onViewResult={handleViewResult} />}
-            {activeTab === "settings" && <SettingsTab onLogout={handleLogout} />}
+            {activeTab === "home"      && <Dashboard data={dashData} loading={dashLoading} onScan={handleScan} />}
+            {activeTab === "analytics" && <AnalyticsTab />}
+            {activeTab === "shopping"  && <ShoppingTab />}
+            {activeTab === "rewards"   && <RewardsTab />}
+            {activeTab === "history"   && <HistoryTab onViewResult={handleViewResult} />}
+            {activeTab === "settings"  && <SettingsTab onLogout={handleLogout} />}
           </motion.div>
         </AnimatePresence>
       </div>

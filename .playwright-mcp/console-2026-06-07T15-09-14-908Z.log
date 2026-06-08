@@ -1,0 +1,66 @@
+[      74ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[      88ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[     143ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <SegmentViewNode type="page" pagePath="page.tsx">
+      <SegmentTrieNode>
+      <ClientPageRoot Component={function Home} serverProvidedParams={{...}}>
+        <Home params={Promise} searchParams={Promise}>
+          <div className="h-[100dvh]..." style={{...}}>
+            <div>
+            <div>
+            <div className="relative z...">
+              <AnimatePresence mode="wait">
+                <PresenceChild isPresent={true} initial={undefined} custom={undefined} presenceAffectsLayout={true} ...>
+                  <PopChild pop={false} isPresent={true} anchorX="left" anchorY="top" root={undefined}>
+                    <PopChildMeasure isPresent={true} childRef={{current:null}} sizeRef={{...}} pop={false}>
+                      <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-5}} ...>
+                        <div className="flex-1 fle..." style={{opacity:0, ...}} ref={function useMotionRef.useCallback}>
+                          <Dashboard data={null} loading={true} onScan={function Home.useCallback[handleScan]} ...>
+                            <div
++                             className="flex-1 flex flex-col overflow-hidden"
+-                             className="flex-1 flex flex-col overflow-hidden px-5 pt-4 pb-3 gap-2.5"
+                            >
+                              <input>
+                              <motion.div className="flex-shrin..." variants={{hidden:{}, ...}} initial="hidden" ...>
+                                <div
++                                 className="flex-shrink-0 px-5 pt-4 space-y-3"
+-                                 className="flex items-center gap-2 flex-shrink-0 h-9"
+                                  style={{
+-                                   opacity: "0"
+-                                   transform: "translateY(40px) scale(0.95)"
+                                  }}
+                                  ref={function useMotionRef.useCallback}
+                                >
+                                  <motion.div variants={{hidden:{...}, ...}} className="flex items...">
++                                   <div
++                                     className="flex items-center gap-3 min-h-[40px]"
++                                     style={{opacity:0,transform:"translateY..."}}
++                                     ref={function useMotionRef.useCallback}
++                                   >
+-                                   <span className="text-[19px] font-black text-white leading-none">
+                                  ...
+                              ...
+            ...
+    ...
+
+    at throwOnHydrationMismatch (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3318:56)
+    at beginWork (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6758:918)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9555:97)
+    at workLoopConcurrentByScheduler (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
