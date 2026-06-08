@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import MascotLottie from "@/components/MascotLottie";
 
 const NAVY: React.CSSProperties = { background: "linear-gradient(160deg, #0a0e1a 0%, #131832 100%)" };
 const GLASS: React.CSSProperties = {
@@ -83,13 +84,7 @@ export default function SignupPage() {
       >
         {/* Mascot + wordmark */}
         <div className="flex flex-col items-center gap-2">
-          <motion.img
-            src="/mascot-celebrating.png"
-            alt=""
-            className="w-[88px] h-[88px] object-contain drop-shadow-[0_0_28px_rgba(139,92,246,0.4)]"
-            animate={{ rotate: [-4, 4, -4] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          />
+          <MascotLottie state="celebrating" style={{ width: 88, height: 88 }} />
           <p className="text-[10px] font-bold tracking-[0.28em] text-zinc-600 uppercase">Receipt Detective</p>
         </div>
 

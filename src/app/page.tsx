@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import MascotLottie from "@/components/MascotLottie";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -614,20 +615,10 @@ function RoadProgressScene({ progress }: { progress: number }) {
           <FedoraSVG className="w-full h-auto"/>
         </motion.div>
 
-        {/* Detective mascot */}
-        <motion.img
-          src="/mascot-default.png"
-          alt=""
-          style={{ position: "relative", zIndex: 10, width: 80, height: 80, objectFit: "contain" }}
-          animate={done
-            ? { y: [0,-18,0,-10,0], scale: [1,1.08,1,1.04,1] }
-            : { y: [0,-4,0,-3,0] }
-          }
-          transition={done
-            ? { duration: 0.8, times: [0,0.25,0.5,0.75,1] }
-            : { duration: 0.32, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
+        {/* Detective mascot — Lottie handles running/celebrating internally */}
+        <div style={{ position: "relative", zIndex: 10, width: 80, height: 80 }}>
+          <MascotLottie key={done ? "done" : "run"} state={done ? "celebrating" : "running"} style={{ width: "100%", height: "100%" }} />
+        </div>
       </motion.div>
 
       <ConfettiBurst active={done}/>
@@ -681,12 +672,7 @@ function Scan({ onProgressDone, filename, error, onRetry }: {
           {error ? (
             <div className="w-full max-w-sm space-y-4">
               <div className="flex justify-center">
-                <motion.img
-                  src="/mascot-default.png" alt=""
-                  className="w-[130px] h-[130px] object-contain"
-                  animate={{ rotate: [-5,5,-5] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                />
+                <MascotLottie state="confused" style={{ width: 130, height: 130 }} />
               </div>
               <div className="rounded-2xl p-4" style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.25)" }}>
                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-[0.2em] mb-1.5">Investigation Failed</p>
@@ -929,16 +915,18 @@ function ResultModal({ open, data, receipt, onClose }: {
                   {scoreLabel}
                 </Badge>
                 {data.score >= 75 && (
-                  <motion.img src="/mascot-thumbsup.png" alt=""
-                    className="w-[120px] h-[120px] object-contain mt-3"
+                  <motion.div className="mt-3" style={{ width: 120, height: 120 }}
                     initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }} />
+                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }}>
+                    <MascotLottie state="thumbsup" style={{ width: "100%", height: "100%" }} />
+                  </motion.div>
                 )}
                 {data.score < 50 && (
-                  <motion.img src="/mascot-confused.png" alt=""
-                    className="w-[120px] h-[120px] object-contain mt-3"
+                  <motion.div className="mt-3" style={{ width: 120, height: 120 }}
                     initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }} />
+                    transition={{ duration: 0.5, delay: 0.7, type: "spring", damping: 16 }}>
+                    <MascotLottie state="confused" style={{ width: "100%", height: "100%" }} />
+                  </motion.div>
                 )}
                 <div className="flex items-center gap-8 mt-5 pt-4 border-t border-white/[0.06] w-full justify-center">
                   <div className="text-center">
@@ -1215,9 +1203,10 @@ function HistoryTab({ onViewResult }: { onViewResult: (r: AnalysisResult) => voi
 
   if (!scans.length) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <motion.img src="/mascot-celebrating.png" alt=""
-        className="w-[120px] h-[120px] object-contain"
-        initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} transition={{ duration: 0.5 }} />
+      <motion.div style={{ width: 120, height: 120 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} transition={{ duration: 0.5 }}>
+        <MascotLottie state="thinking" style={{ width: "100%", height: "100%" }} />
+      </motion.div>
       <p className="text-zinc-400 font-bold">No cases yet.</p>
       <p className="text-zinc-600 text-sm">Scan your first receipt on the Home tab.</p>
     </div>
@@ -1364,14 +1353,14 @@ function ProfileModal({ open, onSave, onSkip }: {
 
           {/* Celebrating mascot */}
           <div className="flex justify-center">
-            <motion.img
-              src="/mascot-celebrating.png"
-              alt=""
-              className="w-[110px] h-[110px] object-contain drop-shadow-[0_0_32px_rgba(139,92,246,0.5)]"
+            <motion.div
+              style={{ width: 110, height: 110 }}
               initial={{ scale: 0.75, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.45, type: "spring", damping: 14 }}
-            />
+            >
+              <MascotLottie state="celebrating" style={{ width: "100%", height: "100%" }} />
+            </motion.div>
           </div>
 
           {/* Copy */}
