@@ -1,11 +1,18 @@
-import { plaidClient, isPlaidConfigured, normalizePlaidCategory } from "@/lib/plaid";
+import { plaidClient, isPlaidConfigured } from "@/lib/plaid";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { syncAccountTransactions } from "@/lib/plaid-sync";
 
-interface ExchangeBody { public_token: string; institution?: { name?: string; institution_id?: string }; }
+interface ExchangeBody {
+  public_token: string;
+  institution?: { name?: string; institution_id?: string };
+}
 
 export async function POST(request: Request) {
   if (!isPlaidConfigured()) {
-    return Response.json({ error: "Plaid not configured." }, { status: 503 });
+    return Response.json(
+      { error: "Plaid not configured. Add PLAID_CLIENT_ID, PLAID_SECRET, and PLAID_ENV to .env.local" },
+      { status: 503 },
+    );
   }
 
   const token = request.headers.get("Authorization")?.replace("Bearer ", "");
@@ -15,7 +22,8 @@ export async function POST(request: Request) {
   if (authErr || !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: ExchangeBody;
-  try { body = await request.json(); } catch { return Response.json({ error: "Invalid request body" }, { status: 400 }); }
+  try { body = await request.json(); }
+  catch { return Response.json({ error: "Invalid request body" }, { status: 400 }); }
 
   const { public_token, institution } = body;
   if (!public_token) return Response.json({ error: "public_token required" }, { status: 400 });
@@ -26,12 +34,12 @@ export async function POST(request: Request) {
     const accessToken = exchangeRes.data.access_token;
     const itemId      = exchangeRes.data.item_id;
 
-    // Fetch accounts associated with this item
+    // Fetch accounts for this item
     const accountsRes = await plaidClient.accountsGet({ access_token: accessToken });
     const accounts    = accountsRes.data.accounts;
 
-    // Save each account to linked_accounts
-    const savedAccounts = [];
+    const savedAccounts: Array<{ id: string; bank_name: string; account_type: string; mask: string | null; user_id: string; plaid_access_token: string; plaid_cursor: null }> = [];
+
     for (const acct of accounts) {
       const row = {
         user_id:            user.id,
@@ -43,26 +51,48 @@ export async function POST(request: Request) {
         mask:               acct.mask ?? null,
         last_synced_at:     null,
       };
+
       const { data: saved } = await supabaseAdmin
         .from("linked_accounts")
         .upsert(row, { onConflict: "plaid_account_id" })
         .select("id")
         .single();
-      if (saved) savedAccounts.push({ ...row, id: saved.id, name: acct.name });
+
+      if (saved) {
+        savedAccounts.push({
+          id:                 saved.id,
+          bank_name:          row.bank_name,
+          account_type:       row.account_type,
+          mask:               row.mask,
+          user_id:            user.id,
+          plaid_access_token: accessToken,
+          plaid_cursor:       null,
+        });
+      }
     }
 
-    // Kick off initial transaction sync (last 90 days)
-    const syncRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", "") ?? ""}/api/plaid/sync`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ account_ids: savedAccounts.map(a => a.id) }),
-    }).catch(() => null); // Don't block on sync failure
-
-    void syncRes;
+    // Kick off initial transaction sync directly (no HTTP, no broken URL)
+    console.log(`[exchange-token] kicking off sync for ${savedAccounts.length} account(s)`);
+    let totalSynced = 0;
+    for (const saved of savedAccounts) {
+      try {
+        const added = await syncAccountTransactions(saved, user.id);
+        totalSynced += added;
+        console.log(`[exchange-token] synced account ${saved.id}: ${added} transactions added`);
+      } catch (syncErr) {
+        console.error(`[exchange-token] sync failed for account ${saved.id}:`, syncErr);
+      }
+    }
 
     return Response.json({
-      success: true,
-      accounts: savedAccounts.map(a => ({ id: a.id, bank_name: a.bank_name, account_type: a.account_type, mask: a.mask })),
+      success:      true,
+      txns_synced:  totalSynced,
+      accounts:     savedAccounts.map(a => ({
+        id:           a.id,
+        bank_name:    a.bank_name,
+        account_type: a.account_type,
+        mask:         a.mask,
+      })),
     });
   } catch (err) {
     console.error("[plaid/exchange-token]", err);
@@ -70,5 +100,3 @@ export async function POST(request: Request) {
     return Response.json({ error: `Plaid error: ${msg}` }, { status: 500 });
   }
 }
-
-export { normalizePlaidCategory };
